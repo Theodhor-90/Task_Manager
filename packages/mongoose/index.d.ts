@@ -35,6 +35,14 @@ export class Schema<T = unknown> {
 export interface Model<T = unknown> {
   readonly modelName: string;
   readonly schema: Schema<T>;
+  countDocuments(filter?: Partial<T> & Record<string, unknown>): Promise<number>;
+  create(doc: Partial<T> & Record<string, unknown>): Promise<T & Document>;
+  findOne(
+    filter?: Partial<T> & Record<string, unknown>
+  ): Promise<(T & Document) | null>;
+  deleteMany(
+    filter?: Partial<T> & Record<string, unknown>
+  ): Promise<{ deletedCount: number }>;
 }
 
 export interface Mongoose {
