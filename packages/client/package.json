@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@remix-run/router": "https://registry.npmjs.org/@remix-run/router/-/router-1.8.0.tgz",
+    "@taskboard/shared": "*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router": "https://registry.npmjs.org/react-router/-/react-router-6.15.0.tgz",

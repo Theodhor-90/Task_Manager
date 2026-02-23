@@ -1,4 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import type { Priority } from "@taskboard/shared";
+import { PRIORITIES } from "@taskboard/shared";
 
 function LoginPage() {
   return <h1>Login</h1>;
@@ -9,7 +11,12 @@ function DashboardPage() {
 }
 
 function BoardPage() {
-  return <h1>Board</h1>;
+  return (
+    <div>
+      <h1>Board</h1>
+      <p>Priority levels: {PRIORITIES.join(", ")}</p>
+    </div>
+  );
 }
 
 export function App() {

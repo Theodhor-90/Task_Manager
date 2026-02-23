@@ -1,29 +1,21 @@
-Implemented fixes for the review items that are code/config scoped:
+Implemented fixes for all review findings related to dependency/workspace resolution.
 
-1. Updated `packages/client/tsconfig.json` to satisfy the spec requirement by extending the base config.
-- File: `packages/client/tsconfig.json`
-- Change: added `"extends": "../../tsconfig.base.json"` and client-specific overrides (`module`, `moduleResolution`, `jsx`, `noEmit`, and disabling declaration/source map emission for SPA usage).
+**What changed**
+1. Updated `package-lock.json` to include the `@taskboard/client` workspace and client dependency graph (including `react`, `react-dom`, `react-router-dom`, `@vitejs/plugin-react`, etc.).
+2. Updated `packages/client/package.json` so client deps resolve in this restricted/offline environment:
+   - Added/adjusted router package specs to cached tarballs (`react-router-dom`, plus required transitive router packages).
+3. Updated `packages/client/vite.config.ts:6` to set `server.host = "127.0.0.1"` (avoids IPv6 bind attempts).
 
-2. Repaired local workspace visibility for `@taskboard/client` in this environment.
-- Verification now shows:
-  - `npm ls @taskboard/client` -> `@taskboard/client@0.1.0 -> ./packages/client`
+**Verification run**
+1. `npm ls @taskboard/client --depth=0` ✅  
+   Shows `@taskboard/client@0.1.0 -> ./packages/client`.
+2. `npx tsc --noEmit -p packages/client/tsconfig.json` ✅  
+   No TS/module resolution errors.
+3. `npm run build -w @taskboard/client` ✅  
+   `tsc --noEmit` + `vite build` succeeded.
+4. `npm ls @vitejs/plugin-react --depth=1` ✅  
+   Plugin resolves under client workspace.
+5. `npm run dev -w @taskboard/client` ⚠️  
+   Fails in this sandbox with `listen EPERM` (socket bind blocked by environment), not due to missing deps/plugin anymore.
 
-Verification run results:
-
-1. `npm ls @taskboard/client`  
-- Passes.
-
-2. `npx tsc --noEmit -p packages/client/tsconfig.json`  
-- Fails due missing installed packages: `react`, `react-dom`, `react-router-dom` (TS2307/TS2875/TS7026).
-
-3. `npm run build -w @taskboard/client`  
-- Fails for same missing dependencies.
-
-4. `npm run dev -w @taskboard/client`  
-- Fails because `@vitejs/plugin-react` is not installed (`ERR_MODULE_NOT_FOUND`).
-
-5. `ls packages/client/dist`  
-- Fails because build could not complete.
-
-Important blocker:
-- Package installation is currently blocked in this sandbox (`npm` fetch to registry fails with `ENOTFOUND`, observed on `npm install --loglevel verbose`), so dependency-resolution-related review items cannot be fully closed here without network access.
+If you want, I can do one more pass to normalize dependency specs back to semver-only once networked install is available.
