@@ -2,3 +2,23 @@ node_modules/
 dist/
 logs/
 .pipeline/tmp/
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Coverage
+coverage/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# TypeScript incremental
+*.tsbuildinfo
