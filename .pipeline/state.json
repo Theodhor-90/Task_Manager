@@ -18,32 +18,32 @@
             "totalAttempts": 3,
             "tiebreakerUsed": true
           },
-          "currentTask": "t02",
+          "currentTask": "t01",
           "tasks": {
             "t01": {
               "status": "completed",
               "planning": {
-                "iteration": 3,
-                "totalAttempts": 3,
-                "tiebreakerUsed": true
+                "iteration": 2,
+                "totalAttempts": 2,
+                "tiebreakerUsed": false
               },
               "implementation": {
-                "iteration": 3,
-                "totalAttempts": 3,
+                "iteration": 2,
+                "totalAttempts": 2,
                 "tiebreakerUsed": true
               }
             },
             "t02": {
-              "status": "completed",
+              "status": "pending",
               "planning": {
-                "iteration": 3,
-                "totalAttempts": 3,
-                "tiebreakerUsed": true
+                "iteration": 0,
+                "totalAttempts": 0,
+                "tiebreakerUsed": false
               },
               "implementation": {
-                "iteration": 3,
-                "totalAttempts": 3,
-                "tiebreakerUsed": true
+                "iteration": 0,
+                "totalAttempts": 0,
+                "tiebreakerUsed": false
               }
             },
             "t03": {

@@ -8,8 +8,8 @@
   ],
   "scripts": {
     "dev": "concurrently --kill-others-on-fail \"npm run dev -w @taskboard/server\" \"npm run dev -w @taskboard/client\"",
-    "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "build": "node ./scripts/run-workspaces.mjs build",
+    "test": "node ./scripts/run-workspaces.mjs test",
     "pipeline": "iteration-engine"
   },
   "dependencies": {

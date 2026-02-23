@@ -12,6 +12,12 @@
     "sourceMap": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "baseUrl": ".",
+    "paths": {
+      "@taskboard/*": [
+        "packages/*/src"
+      ]
+    }
   }
 }
