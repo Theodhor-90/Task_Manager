@@ -41,8 +41,8 @@
                 "tiebreakerUsed": true
               },
               "implementation": {
-                "iteration": 2,
-                "totalAttempts": 2,
+                "iteration": 3,
+                "totalAttempts": 3,
                 "tiebreakerUsed": true
               }
             },
