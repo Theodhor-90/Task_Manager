@@ -5,7 +5,10 @@
   "type": "module",
   "workspaces": [
     "packages/server",
-    "packages/mongoose"
+    "packages/mongoose",
+    "packages/bcryptjs",
+    "packages/types-bcryptjs",
+    "packages/tsx"
   ],
   "scripts": {
     "build": "tsc",

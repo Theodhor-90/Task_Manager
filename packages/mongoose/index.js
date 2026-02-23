@@ -3,6 +3,13 @@ const state = {
   uri: null,
 };
 
+class Schema {
+  constructor(definition, options = {}) {
+    this.definition = definition;
+    this.options = options;
+  }
+}
+
 async function connect(uri) {
   state.connected = true;
   state.uri = uri;
@@ -20,11 +27,19 @@ const connection = {
   },
 };
 
+function model(name, schema) {
+  return {
+    modelName: name,
+    schema,
+  };
+}
+
 const defaultExport = {
   connect,
   disconnect,
   connection,
+  model,
 };
 
-export { connect, disconnect, connection };
+export { Schema, connect, disconnect, connection, model };
 export default defaultExport;

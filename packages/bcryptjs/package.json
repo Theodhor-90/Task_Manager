@@ -1,0 +1,6 @@
+{
+  "name": "bcryptjs",
+  "version": "2.4.3",
+  "type": "module",
+  "main": "index.js"
+}

@@ -10,9 +10,11 @@
     "test": "node --test"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "mongoose": "^8.19.1"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"
   }
