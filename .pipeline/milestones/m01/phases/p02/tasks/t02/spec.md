@@ -1,34 +1,30 @@
-## Task: User Model with Password Hashing
+# Task t02 Spec: User Model with Password Hashing
 
-### Objective
-Implement the Mongoose User model with email uniqueness, required field validation, and bcrypt password hashing utilities.
+## Objective
+Implement the User Mongoose model and password hashing utilities for the server package.
 
-### Deliverables
-- **Create** `packages/server/src/models/user.model.ts`
+## Required Deliverable
+- `packages/server/src/models/user.model.ts` exporting:
+  - `UserModel`
+  - `hashPassword(plain: string): Promise<string>`
+  - `verifyPassword(plain: string, hash: string): Promise<boolean>`
 
-### Implementation Details
-- Define a Mongoose schema matching the shared `User` interface from `packages/shared/src/types/index.ts`
-- Fields:
-  - `email`: String, required, unique, lowercase, trimmed
-  - `passwordHash`: String, required
-  - `name`: String, required
-  - Timestamps: enabled (`createdAt`, `updatedAt` auto-managed)
-- Unique index on `email`
-- Create standalone password utility functions (not pre-save hooks):
-  - `hashPassword(plain: string): Promise<string>` — hashes using bcryptjs
-  - `verifyPassword(plain: string, hash: string): Promise<boolean>` — compares using bcryptjs
-- Install `bcryptjs` (pure JavaScript implementation) as a dependency and `@types/bcryptjs` as a dev dependency in `packages/server`
-- Export the `UserModel` (Mongoose model) and the hash/verify helper functions
+## Requirements
+- Define a User schema with:
+  - `email`: required, unique, lowercase, trimmed
+  - `passwordHash`: required
+  - `name`: required
+- Enable Mongoose timestamps (`createdAt`, `updatedAt`).
+- Implement password hashing using `bcryptjs` via utility functions (`hashPassword` and `verifyPassword`).
+- Model module must compile cleanly in `@taskboard/server`.
 
-### Dependencies
-- **t01**: MongoDB connection module must exist (Mongoose must be installed)
-- Requires `bcryptjs` and `@types/bcryptjs` npm packages
-- Uses shared types from `packages/shared/src/types/index.ts`
+## Verification
+Run:
+1. `npm install bcryptjs -w @taskboard/server && npm install -D @types/bcryptjs -w @taskboard/server`
+2. `npm run build -w @taskboard/server`
+3. `cd packages/server && npx tsx -e "import { UserModel, hashPassword, verifyPassword } from './src/models/user.model.js'; console.log('UserModel:', typeof UserModel); console.log('hashPassword:', typeof hashPassword); console.log('verifyPassword:', typeof verifyPassword);"`
+4. `cd packages/server && npx tsx -e "import { hashPassword, verifyPassword } from './src/models/user.model.js'; const hash = await hashPassword('test123'); console.log('hash prefix ok:', hash.startsWith('$2')); console.log('verify ok:', await verifyPassword('test123', hash)); console.log('verify wrong:', (await verifyPassword('wrong', hash)) === false);"`
+5. `npm run test -w @taskboard/server`
 
-### Verification Criteria
-- `UserModel` can create a user document with valid fields
-- Creating a user with a duplicate email is rejected (unique constraint)
-- Creating a user with missing required fields (email, passwordHash, name) is rejected
-- `hashPassword` returns a bcrypt hash string
-- `verifyPassword` returns `true` for correct password, `false` for incorrect
-- Email is stored lowercase and trimmed regardless of input casing/whitespace
+## Scope Source
+This task scope is derived from `.pipeline/milestones/m01/spec-v1.md` (Phase 2, Deliverable #2).

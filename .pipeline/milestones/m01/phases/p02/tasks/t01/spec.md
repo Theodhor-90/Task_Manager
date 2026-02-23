@@ -1,25 +1,24 @@
-## Task: MongoDB Connection Module
+# Task t01 Spec: MongoDB Connection Module
 
-### Objective
-Create the MongoDB connection module that provides `connectDb` and `disconnectDb` functions using Mongoose, configurable via the `MONGODB_URI` environment variable.
+## Objective
+Implement MongoDB connection helpers for the server package.
 
-### Deliverables
-- **Create** `packages/server/src/db.ts`
+## Required Deliverable
+- `packages/server/src/db.ts` exporting:
+  - `connectDb(): Promise<void>`
+  - `disconnectDb(): Promise<void>`
 
-### Implementation Details
-- Export an async `connectDb()` function that connects to MongoDB using `mongoose.connect()` with the URI from `config.mongodbUri` (already defined in `packages/server/src/config.ts` — defaults to `mongodb://localhost:27017/taskboard`)
-- Export an async `disconnectDb()` function that calls `mongoose.disconnect()`
-- Include connection error handling and logging (log successful connection, throw/log on failure)
-- Use the existing `Config` interface and `config` object from `packages/server/src/config.ts`
-- Install `mongoose` as a dependency in `packages/server`
+## Requirements
+- Use `mongoose` for MongoDB connectivity.
+- Read connection URI from `config.mongodbUri`.
+- `connectDb` must log failures and rethrow connection errors.
+- `disconnectDb` must close the mongoose default connection.
+- Module must compile and be exportable via `packages/server/src/index.ts`.
 
-### Dependencies
-- Phase 1 complete (server package scaffold, config module)
-- Requires `mongoose` npm package (to be installed)
-- Requires a running MongoDB instance accessible at the configured URI
-
-### Verification Criteria
-- `connectDb()` connects to MongoDB successfully when a MongoDB instance is running
-- `disconnectDb()` cleanly closes the connection
-- Connection errors are handled (logged/thrown) — not silently swallowed
-- The module imports and uses `config.mongodbUri` from the existing config
+## Verification
+Run:
+1. `npm install mongoose -w @taskboard/server`
+2. `npm run build -w @taskboard/server`
+3. `cd packages/server && npx tsx -e "import { connectDb, disconnectDb } from './src/db.js'; console.log('imports ok:', typeof connectDb, typeof disconnectDb)"`
+4. `cd packages/server && npx tsx -e "import { connectDb, disconnectDb } from './src/db.js'; await connectDb(); await disconnectDb(); console.log('Connection test passed');"`
+5. `npm run test -w @taskboard/server`

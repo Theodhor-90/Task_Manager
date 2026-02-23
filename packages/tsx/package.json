@@ -1,0 +1,8 @@
+{
+  "name": "tsx",
+  "version": "4.20.0",
+  "type": "module",
+  "bin": {
+    "tsx": "cli.js"
+  }
+}
