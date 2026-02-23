@@ -1,0 +1,46 @@
+{
+  "project": "taskboard",
+  "currentMilestone": "m01",
+  "milestones": {
+    "m01": {
+      "status": "planning",
+      "planning": {
+        "iteration": 0,
+        "totalAttempts": 0,
+        "tiebreakerUsed": false
+      },
+      "currentPhase": null,
+      "phases": {}
+    },
+    "m02": {
+      "status": "pending",
+      "planning": {
+        "iteration": 0,
+        "totalAttempts": 0,
+        "tiebreakerUsed": false
+      },
+      "currentPhase": null,
+      "phases": {}
+    },
+    "m03": {
+      "status": "pending",
+      "planning": {
+        "iteration": 0,
+        "totalAttempts": 0,
+        "tiebreakerUsed": false
+      },
+      "currentPhase": null,
+      "phases": {}
+    },
+    "m04": {
+      "status": "pending",
+      "planning": {
+        "iteration": 0,
+        "totalAttempts": 0,
+        "tiebreakerUsed": false
+      },
+      "currentPhase": null,
+      "phases": {}
+    }
+  }
+}

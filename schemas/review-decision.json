@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["approved", "needs_revision"]
+    },
+    "feedback": {
+      "type": "string",
+      "description": "Brief summary if approved. Specific issues if needs_revision."
+    },
+    "issues": {
+      "type": "array",
+      "description": "Present only when needs_revision.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": { "type": "string" },
+          "description": { "type": "string" }
+        },
+        "required": ["file", "description"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["verdict", "feedback", "issues"],
+  "additionalProperties": false
+}

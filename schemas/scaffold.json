@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Directory name, e.g. m01, p01, t01"
+          },
+          "title": {
+            "type": "string",
+            "description": "Human-readable name"
+          },
+          "spec": {
+            "type": "string",
+            "description": "Seed specification content in markdown"
+          }
+        },
+        "required": ["id", "title", "spec"]
+      }
+    }
+  },
+  "required": ["items"]
+}
