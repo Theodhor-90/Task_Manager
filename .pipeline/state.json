@@ -18,7 +18,7 @@
             "totalAttempts": 3,
             "tiebreakerUsed": true
           },
-          "currentTask": "t03",
+          "currentTask": "t04",
           "tasks": {
             "t01": {
               "status": "completed",
@@ -60,16 +60,16 @@
               }
             },
             "t04": {
-              "status": "pending",
+              "status": "completed",
               "planning": {
-                "iteration": 0,
-                "totalAttempts": 0,
+                "iteration": 2,
+                "totalAttempts": 2,
                 "tiebreakerUsed": false
               },
               "implementation": {
-                "iteration": 0,
-                "totalAttempts": 0,
-                "tiebreakerUsed": false
+                "iteration": 2,
+                "totalAttempts": 2,
+                "tiebreakerUsed": true
               }
             },
             "t05": {
