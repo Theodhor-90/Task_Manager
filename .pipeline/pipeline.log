@@ -27,3 +27,24 @@ All prerequisites met.
 [m01/p01/t05] [implementation] Draft v1 approved
 [checkpoint] State saved after: task m01/p01/t05 completed
 [git] Staging all changes for task t05
+[git] Committing task m01/p01/t05
+[checkpoint] State saved after: task m01/p01/t06 → planning
+[m01/p01/t06] [task] Drafting
+[cli] claude -p (tools: Read,Glob,Grep, max-turns: 25, schema: none)
+[m01/p01/t06] [task] Challenging draft v1
+[cli] claude -p (tools: Read,Glob,Grep, max-turns: 25, schema: challenge-decision.json)
+[m01/p01/t06] [task] Draft v1 rejected
+[m01/p01/t06] [task] Refining (iteration 2)
+[cli] claude -p (tools: Read,Glob,Grep, max-turns: 25, schema: none)
+[m01/p01/t06] [task] Challenging draft v2
+[cli] claude -p (tools: Read,Glob,Grep, max-turns: 25, schema: challenge-decision.json)
+[m01/p01/t06] [task] Draft v2 approved
+[checkpoint] State saved after: task m01/p01/t06 plan locked
+[checkpoint] State saved after: task m01/p01/t06 → implementing
+[m01/p01/t06] [implementation] Drafting
+[cli] codex exec (sandbox: workspace-write, schema: none)
+[m01/p01/t06] [implementation] Challenging draft v1
+[cli] codex exec (sandbox: workspace-write, schema: review-decision.json)
+[m01/p01/t06] [implementation] Draft v1 approved
+[checkpoint] State saved after: task m01/p01/t06 completed
+[git] Staging all changes for task t06
