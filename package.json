@@ -1,25 +1,22 @@
 {
-  "name": "pipeline",
+  "name": "taskboard",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/server",
-    "packages/mongoose",
-    "packages/bcryptjs",
-    "packages/types-bcryptjs",
-    "packages/tsx"
+    "packages/*"
   ],
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "start": "tsc && node dist/orchestrator.js",
-    "pipeline": "tsc && node dist/orchestrator.js"
+    "dev": "concurrently --kill-others-on-fail \"npm run dev -w @taskboard/server\" \"npm run dev -w @taskboard/client\"",
+    "build": "node ./scripts/run-workspaces.mjs build",
+    "test": "node ./scripts/run-workspaces.mjs test",
+    "pipeline": "iteration-engine"
+  },
+  "dependencies": {
+    "iteration-engine": "file:../Iteration_Engine"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "concurrently": "^9.0.0",
+    "typescript": "^5.7.0"
   }
 }
