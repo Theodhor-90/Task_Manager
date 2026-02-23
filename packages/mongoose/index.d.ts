@@ -10,8 +10,24 @@ export interface SchemaOptions {
   timestamps?: boolean;
 }
 
+export namespace Types {
+  class ObjectId {
+    constructor(value?: string);
+    toString(): string;
+  }
+
+  interface DocumentArray<T> extends Array<T> {}
+}
+
+export const Types: {
+  ObjectId: typeof Types.ObjectId;
+};
+
 export class Schema<T = unknown> {
   constructor(definition: Record<string, unknown>, options?: SchemaOptions);
+  static Types: {
+    ObjectId: typeof Types.ObjectId;
+  };
   readonly definition: Record<string, unknown>;
   readonly options: SchemaOptions;
 }

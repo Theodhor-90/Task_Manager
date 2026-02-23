@@ -1,9 +1,29 @@
+import { randomBytes } from "node:crypto";
+
 const state = {
   connected: false,
   uri: null,
 };
 
+class ObjectId {
+  constructor(value) {
+    this.value = value ?? randomBytes(12).toString("hex");
+  }
+
+  toString() {
+    return this.value;
+  }
+}
+
+const Types = {
+  ObjectId,
+};
+
 class Schema {
+  static Types = {
+    ObjectId,
+  };
+
   constructor(definition, options = {}) {
     this.definition = definition;
     this.options = options;
@@ -41,5 +61,5 @@ const defaultExport = {
   model,
 };
 
-export { Schema, connect, disconnect, connection, model };
+export { Schema, Types, connect, disconnect, connection, model };
 export default defaultExport;
