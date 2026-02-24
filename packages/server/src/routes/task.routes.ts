@@ -157,8 +157,56 @@ function isValidMoveTaskBody(
 }
 
 export const boardTaskRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/:boardId/tasks", async (_request, reply) => {
-    return reply.code(501).send({ error: "Not implemented" });
+  app.get("/:boardId/tasks", async (request, reply) => {
+    const { boardId } = request.params as { boardId: string };
+
+    if (!isValidObjectId(boardId)) {
+      return reply.code(400).send({ error: "Invalid board ID" });
+    }
+
+    const board = await BoardModel.findOne({ _id: boardId });
+
+    if (!board) {
+      return reply.code(404).send({ error: "Board not found" });
+    }
+
+    const project = await ProjectModel.findOne({
+      _id: board.project,
+      owner: request.user.id,
+    });
+
+    if (!project) {
+      return reply.code(404).send({ error: "Board not found" });
+    }
+
+    const query = request.query as Record<string, string | undefined>;
+    const { status, priority, label, sort, order } = query;
+    const filter: Record<string, unknown> = { board: boardId };
+
+    if (status !== undefined) {
+      filter.status = status;
+    }
+
+    if (priority !== undefined) {
+      filter.priority = priority;
+    }
+
+    if (label !== undefined) {
+      filter.labels = label;
+    }
+
+    const allowedSortFields = ["createdAt", "dueDate", "position"];
+    const sortField = sort !== undefined && allowedSortFields.includes(sort) ? sort : "position";
+    const sortDirection = order === "desc" ? -1 : 1;
+    const sortObj: Record<string, number> = { [sortField]: sortDirection };
+
+    const tasks = await (TaskModel as unknown as {
+      find(filter: Record<string, unknown>): {
+        sort(sortObj: Record<string, number>): Promise<unknown[]>;
+      };
+    }).find(filter).sort(sortObj);
+
+    return reply.code(200).send({ data: tasks });
   });
 
   app.post("/:boardId/tasks", async (request, reply) => {
