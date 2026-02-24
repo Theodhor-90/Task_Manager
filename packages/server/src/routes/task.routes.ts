@@ -271,19 +271,160 @@ export const boardTaskRoutes: FastifyPluginAsync = async (app) => {
 };
 
 export const taskRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/:id", async (_request, reply) => {
-    return reply.code(501).send({ error: "Not implemented" });
+  app.get("/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    if (!isValidObjectId(id)) {
+      return reply.code(400).send({ error: "Invalid task ID" });
+    }
+
+    const task = await (TaskModel as unknown as {
+      findOne(filter: Record<string, unknown>): {
+        populate(field: string): Promise<Record<string, unknown> | null>;
+      };
+    }).findOne({ _id: id }).populate("labels");
+
+    if (!task) {
+      return reply.code(404).send({ error: "Task not found" });
+    }
+
+    const board = await BoardModel.findOne({ _id: task.board });
+
+    if (!board) {
+      return reply.code(404).send({ error: "Task not found" });
+    }
+
+    const project = await ProjectModel.findOne({
+      _id: board.project,
+      owner: request.user.id,
+    });
+
+    if (!project) {
+      return reply.code(404).send({ error: "Task not found" });
+    }
+
+    return reply.code(200).send({ data: task });
   });
 
   app.put("/:id/move", async (_request, reply) => {
     return reply.code(501).send({ error: "Not implemented" });
   });
 
-  app.put("/:id", async (_request, reply) => {
-    return reply.code(501).send({ error: "Not implemented" });
+  app.put("/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    if (!isValidObjectId(id)) {
+      return reply.code(400).send({ error: "Invalid task ID" });
+    }
+
+    if (!isValidUpdateTaskBody(request.body)) {
+      return reply.code(400).send({ error: "At least one valid field is required" });
+    }
+
+    const task = await TaskModel.findOne({ _id: id });
+
+    if (!task) {
+      return reply.code(404).send({ error: "Task not found" });
+    }
+
+    const board = await BoardModel.findOne({ _id: task.board });
+
+    if (!board) {
+      return reply.code(404).send({ error: "Task not found" });
+    }
+
+    const project = await ProjectModel.findOne({
+      _id: board.project,
+      owner: request.user.id,
+    });
+
+    if (!project) {
+      return reply.code(404).send({ error: "Task not found" });
+    }
+
+    const { title, description, priority, dueDate, labels } = request.body;
+    const updates: Record<string, unknown> = {};
+    if (title !== undefined) updates.title = title;
+    if (description !== undefined) updates.description = description;
+    if (priority !== undefined) updates.priority = priority;
+    if (dueDate !== undefined) updates.dueDate = dueDate;
+    if (labels !== undefined) updates.labels = labels;
+
+    const updatedTask = await (TaskModel as unknown as {
+      findOneAndUpdate(
+        filter: Record<string, unknown>,
+        update: Record<string, unknown>,
+        options: Record<string, unknown>,
+      ): Promise<Record<string, unknown> | null>;
+    }).findOneAndUpdate(
+      { _id: id },
+      updates,
+      { new: true },
+    );
+
+    return reply.code(200).send({ data: updatedTask });
   });
 
-  app.delete("/:id", async (_request, reply) => {
-    return reply.code(501).send({ error: "Not implemented" });
+  app.delete("/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    if (!isValidObjectId(id)) {
+      return reply.code(400).send({ error: "Invalid task ID" });
+    }
+
+    const task = await TaskModel.findOne({ _id: id });
+
+    if (!task) {
+      return reply.code(404).send({ error: "Task not found" });
+    }
+
+    const board = await BoardModel.findOne({ _id: task.board });
+
+    if (!board) {
+      return reply.code(404).send({ error: "Task not found" });
+    }
+
+    const project = await ProjectModel.findOne({
+      _id: board.project,
+      owner: request.user.id,
+    });
+
+    if (!project) {
+      return reply.code(404).send({ error: "Task not found" });
+    }
+
+    const taskBoard = task.board;
+    const taskStatus = task.status;
+
+    await CommentModel.deleteMany({ task: id } as Record<string, unknown>);
+    await (TaskModel as unknown as {
+      deleteOne(filter: Record<string, unknown>): Promise<{ deletedCount: number }>;
+    }).deleteOne({ _id: id } as Record<string, unknown>);
+
+    const remainingTasks = await (TaskModel as unknown as {
+      find(filter: Record<string, unknown>): {
+        sort(
+          sortObj: Record<string, number>,
+        ): Promise<Array<{ _id: unknown; position: number; save?: () => Promise<void> }>>;
+      };
+    }).find({ board: taskBoard, status: taskStatus }).sort({ position: 1 });
+
+    for (let i = 0; i < remainingTasks.length; i++) {
+      if (remainingTasks[i].position !== i) {
+        await (TaskModel as unknown as {
+          findOneAndUpdate(
+            filter: Record<string, unknown>,
+            update: Record<string, unknown>,
+            options: Record<string, unknown>,
+          ): Promise<Record<string, unknown> | null>;
+        }).findOneAndUpdate(
+          { _id: remainingTasks[i]._id },
+          { position: i },
+          { new: true },
+        );
+      }
+    }
+
+    return reply.code(200).send({ data: { message: "Task deleted" } });
   });
 };
