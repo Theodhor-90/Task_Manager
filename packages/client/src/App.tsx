@@ -1,6 +1,8 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/auth-context";
+import { ProjectsProvider } from "./context/projects-context";
 import { ProtectedRoute } from "./components/protected-route";
+import { AppLayout } from "./components/app-layout";
 import { LoginPage } from "./pages/login-page";
 import { DashboardPage } from "./pages/dashboard-page";
 import { BoardPage } from "./pages/board-page";
@@ -12,8 +14,16 @@ export function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/projects/:id/board" element={<BoardPage />} />
+            <Route
+              element={
+                <ProjectsProvider>
+                  <AppLayout />
+                </ProjectsProvider>
+              }
+            >
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/projects/:id/board" element={<BoardPage />} />
+            </Route>
           </Route>
         </Routes>
       </AuthProvider>
