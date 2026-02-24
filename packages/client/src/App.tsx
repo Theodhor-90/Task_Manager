@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import type { Priority } from "@taskboard/shared";
 import { PRIORITIES } from "@taskboard/shared";
+import { AuthProvider } from "./context/auth-context";
+import { ProtectedRoute } from "./components/protected-route";
 
 function LoginPage() {
   return <h1>Login</h1>;
@@ -22,11 +23,15 @@ function BoardPage() {
 export function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/projects/:id/board" element={<BoardPage />} />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/projects/:id/board" element={<BoardPage />} />
+          </Route>
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }
