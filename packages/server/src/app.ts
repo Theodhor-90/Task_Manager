@@ -6,6 +6,7 @@ import { authMiddleware } from "./middleware/auth.middleware.js";
 import { authRoutes } from "./routes/auth.routes.js";
 import { boardRoutes, columnRoutes } from "./routes/board.routes.js";
 import { projectRoutes } from "./routes/project.routes.js";
+import { boardTaskRoutes, taskRoutes } from "./routes/task.routes.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -24,6 +25,8 @@ export async function buildApp() {
   await app.register(projectRoutes, { prefix: "/api/projects" });
   await app.register(boardRoutes, { prefix: "/api/projects" });
   await app.register(columnRoutes, { prefix: "/api/boards" });
+  await app.register(boardTaskRoutes, { prefix: "/api/boards" });
+  await app.register(taskRoutes, { prefix: "/api/tasks" });
 
   return app;
 }

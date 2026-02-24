@@ -100,8 +100,26 @@ function matches(doc: Record<string, unknown>, filter: Record<string, unknown> =
         const docVal = normalizeForCompare(doc[key]);
         return list.some((item) => normalizeForCompare(item) === docVal);
       }
+      if ("$ne" in operators) {
+        const docVal = normalizeForCompare(doc[key]);
+        const neVal = normalizeForCompare(operators.$ne);
+        return docVal !== neVal;
+      }
+      if ("$gte" in operators) {
+        const docVal = doc[key];
+        const gteVal = operators.$gte;
+        if (typeof docVal === "number" && typeof gteVal === "number") {
+          return docVal >= gteVal;
+        }
+        return false;
+      }
     }
-    return normalizeForCompare(doc[key]) === normalizeForCompare(value);
+    const docVal = normalizeForCompare(doc[key]);
+    const filterVal = normalizeForCompare(value);
+    if (Array.isArray(docVal) && !Array.isArray(filterVal)) {
+      return (docVal as unknown[]).some((item) => item === filterVal);
+    }
+    return docVal === filterVal;
   });
 }
 
@@ -312,9 +330,47 @@ function model(name: string, schema: Schema) {
       setCollectionDocs(name, docs);
       return created;
     },
-    async findOne(filter: Record<string, unknown> = {}): Promise<Record<string, unknown> | null> {
+    findOne(filter: Record<string, unknown> = {}) {
       const found = getCollectionDocs(name).find((doc) => matches(doc, filter));
-      return found ?? null;
+      let result = found ?? null;
+      const query = {
+        populate(field: string) {
+          if (result && field && Array.isArray(result[field])) {
+            const refDocs = result[field] as unknown[];
+            const fieldDef = schema.definition[field];
+            let refModelName: string | null = null;
+
+            if (Array.isArray(fieldDef)) {
+              const itemDef = fieldDef[0];
+              if (itemDef && typeof itemDef === "object" && itemDef.ref) {
+                refModelName = itemDef.ref;
+              }
+            } else if (fieldDef && typeof fieldDef === "object" && fieldDef.ref) {
+              refModelName = fieldDef.ref;
+            }
+
+            if (refModelName) {
+              const refCollection = getCollectionDocs(refModelName);
+              const populated = refDocs.map((refId) => {
+                const refIdStr = normalizeForCompare(refId);
+                const refDoc = refCollection.find(
+                  (doc) => normalizeForCompare(doc._id) === refIdStr,
+                );
+                return refDoc ?? refId;
+              });
+              result = { ...result, [field]: populated };
+            }
+          }
+          return this;
+        },
+        then(
+          onfulfilled?: (value: Record<string, unknown> | null) => unknown,
+          onrejected?: (reason: unknown) => unknown,
+        ) {
+          return Promise.resolve(result).then(onfulfilled, onrejected);
+        },
+      };
+      return query;
     },
     async findOneAndUpdate(
       filter: Record<string, unknown>,
