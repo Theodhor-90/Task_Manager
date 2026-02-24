@@ -1,24 +1,9 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { PRIORITIES } from "@taskboard/shared";
 import { AuthProvider } from "./context/auth-context";
 import { ProtectedRoute } from "./components/protected-route";
-
-function LoginPage() {
-  return <h1>Login</h1>;
-}
-
-function DashboardPage() {
-  return <h1>Dashboard</h1>;
-}
-
-function BoardPage() {
-  return (
-    <div>
-      <h1>Board</h1>
-      <p>Priority levels: {PRIORITIES.join(", ")}</p>
-    </div>
-  );
-}
+import { LoginPage } from "./pages/login-page";
+import { DashboardPage } from "./pages/dashboard-page";
+import { BoardPage } from "./pages/board-page";
 
 export function App() {
   return (
