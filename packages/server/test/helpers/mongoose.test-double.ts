@@ -432,6 +432,47 @@ function model(name: string, schema: Schema) {
         lean() {
           return this;
         },
+        populate(field: string, selectStr?: string) {
+          const fieldDef = schema.definition[field];
+          let refModelName: string | null = null;
+
+          if (fieldDef && typeof fieldDef === "object" && !Array.isArray(fieldDef) && fieldDef.ref) {
+            refModelName = fieldDef.ref;
+          }
+
+          if (refModelName) {
+            const refCollection = getCollectionDocs(refModelName);
+            const selectedFields = selectStr ? selectStr.split(" ") : null;
+
+            this._results = this._results.map((doc: Record<string, unknown>) => {
+              const refId = doc[field];
+              if (refId === undefined || refId === null) return doc;
+
+              const refIdStr = normalizeForCompare(refId);
+              const refDoc = refCollection.find(
+                (d: Record<string, unknown>) => normalizeForCompare(d._id) === refIdStr,
+              );
+
+              if (!refDoc) return doc;
+
+              let populatedValue: Record<string, unknown>;
+              if (selectedFields) {
+                populatedValue = { _id: refDoc._id };
+                for (const f of selectedFields) {
+                  if (f in refDoc) {
+                    populatedValue[f] = refDoc[f];
+                  }
+                }
+              } else {
+                populatedValue = { ...refDoc };
+              }
+
+              return { ...doc, [field]: populatedValue };
+            });
+          }
+
+          return this;
+        },
         then(onfulfilled?: (value: Record<string, unknown>[]) => unknown, onrejected?: (reason: unknown) => unknown) {
           return Promise.resolve(this._results).then(onfulfilled, onrejected);
         },
@@ -454,6 +495,47 @@ function model(name: string, schema: Schema) {
       docs.splice(index, 1);
       setCollectionDocs(name, docs);
       return { deletedCount: 1 };
+    },
+    async updateMany(
+      filter: Record<string, unknown> = {},
+      update: Record<string, unknown> = {},
+    ): Promise<{ modifiedCount: number; matchedCount: number }> {
+      const docs = getCollectionDocs(name);
+      let matchedCount = 0;
+      let modifiedCount = 0;
+
+      for (const doc of docs) {
+        if (!matches(doc, filter)) continue;
+        matchedCount++;
+        let modified = false;
+
+        if (update.$pull && typeof update.$pull === "object") {
+          const pullOps = update.$pull as Record<string, unknown>;
+          for (const [pullField, pullValue] of Object.entries(pullOps)) {
+            if (Array.isArray(doc[pullField])) {
+              const arr = doc[pullField] as unknown[];
+              const pullValStr = normalizeForCompare(pullValue);
+              const newArr = arr.filter(
+                (item) => normalizeForCompare(item) !== pullValStr,
+              );
+              if (newArr.length !== arr.length) {
+                doc[pullField] = newArr;
+                modified = true;
+              }
+            }
+          }
+        }
+
+        if (modified) {
+          modifiedCount++;
+          if (schema?.options?.timestamps) {
+            doc.updatedAt = new Date();
+          }
+        }
+      }
+
+      setCollectionDocs(name, docs);
+      return { modifiedCount, matchedCount };
     },
   };
 }
