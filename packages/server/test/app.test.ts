@@ -88,3 +88,83 @@ describe("config", () => {
     expect(config.corsOrigin).toBe("http://localhost:5173");
   });
 });
+
+describe("auth middleware", () => {
+  it("allows access to health endpoint without token (allow-listed)", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/health",
+    });
+    expect(response.statusCode).toBe(200);
+    await app.close();
+  });
+
+  it("rejects requests to protected routes without a token", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/protected-resource",
+    });
+    expect(response.statusCode).toBe(401);
+    expect(JSON.parse(response.body)).toEqual({ error: "Unauthorized" });
+    await app.close();
+  });
+
+  it("rejects requests with an invalid token", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/protected-resource",
+      headers: {
+        authorization: "Bearer invalid.token.garbage",
+      },
+    });
+    expect(response.statusCode).toBe(401);
+    expect(JSON.parse(response.body)).toEqual({ error: "Unauthorized" });
+    await app.close();
+  });
+
+  it("allows access with a valid token and populates request.user", async () => {
+    const app = await buildApp();
+
+    app.get("/api/test-user", async (request) => {
+      return { data: request.user };
+    });
+
+    const payload = { id: "user123", email: "test@test.com", name: "Test" };
+    const token = app.jwt.sign(payload);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/test-user",
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.data.id).toBe("user123");
+    expect(body.data.email).toBe("test@test.com");
+    expect(body.data.name).toBe("Test");
+    await app.close();
+  });
+
+  it("rejects requests with a tampered token", async () => {
+    const app = await buildApp();
+
+    const token = app.jwt.sign({ id: "user123", email: "a@b.com", name: "A" });
+    const tampered = token.slice(0, -1) + (token.endsWith("A") ? "B" : "A");
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/protected-resource",
+      headers: {
+        authorization: `Bearer ${tampered}`,
+      },
+    });
+    expect(response.statusCode).toBe(401);
+    expect(JSON.parse(response.body)).toEqual({ error: "Unauthorized" });
+    await app.close();
+  });
+});
