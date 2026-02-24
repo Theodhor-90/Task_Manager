@@ -134,4 +134,79 @@ export const columnRoutes: FastifyPluginAsync = async (app) => {
 
     return reply.code(201).send({ data: columnData });
   });
+
+  app.put("/:boardId/columns/:columnId", async (request, reply) => {
+    const { boardId, columnId } = request.params as {
+      boardId: string;
+      columnId: string;
+    };
+
+    if (!isValidObjectId(boardId)) {
+      return reply.code(400).send({ error: "Invalid board ID" });
+    }
+
+    if (!isValidObjectId(columnId)) {
+      return reply.code(400).send({ error: "Invalid column ID" });
+    }
+
+    if (!isValidCreateColumnBody(request.body)) {
+      return reply.code(400).send({ error: "Column name is required" });
+    }
+
+    const { name } = request.body;
+    const board = await BoardModel.findOne({ _id: boardId });
+
+    if (!board) {
+      return reply.code(404).send({ error: "Board not found" });
+    }
+
+    const project = await ProjectModel.findOne({
+      _id: board.project,
+      owner: request.user.id,
+    });
+
+    if (!project) {
+      return reply.code(404).send({ error: "Board not found" });
+    }
+
+    const columns = board.columns as unknown as Array<{
+      _id: unknown;
+      name: string;
+      position: number;
+      toJSON?: () => Record<string, unknown>;
+    }>;
+    const column = columns.find((col) => String(col._id) === columnId);
+
+    if (!column) {
+      return reply.code(404).send({ error: "Column not found" });
+    }
+
+    column.name = name;
+
+    const boardWithSave = board as unknown as {
+      save?: () => Promise<void>;
+      columns: unknown;
+    };
+
+    if (typeof boardWithSave.save === "function") {
+      await boardWithSave.save();
+    } else {
+      await (BoardModel as unknown as {
+        findOneAndUpdate(
+          filter: Record<string, unknown>,
+          update: Record<string, unknown>,
+        ): Promise<Record<string, unknown> | null>;
+      }).findOneAndUpdate(
+        { _id: boardId },
+        { columns: boardWithSave.columns as Record<string, unknown>[] },
+      );
+    }
+
+    const columnWithToJson = column as unknown as Partial<{ toJSON(): Record<string, unknown> }>;
+    const columnData = typeof columnWithToJson.toJSON === "function"
+      ? columnWithToJson.toJSON()
+      : column;
+
+    return reply.code(200).send({ data: columnData });
+  });
 };

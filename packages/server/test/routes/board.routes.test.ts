@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import request from "supertest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../src/app.js";
-import { UserModel, hashPassword } from "../../src/models/index.js";
+import { UserModel, hashPassword, TaskModel } from "../../src/models/index.js";
 import { setupTestDb, teardownTestDb, clearCollections } from "../helpers/db.js";
 
 type HttpMethod = "get" | "post" | "put" | "delete";
@@ -128,6 +128,23 @@ describe("board routes", () => {
       projectId,
       boardId: normalizeId(boardBody.data._id),
     };
+  }
+
+  async function getColumnId(
+    projectId: string,
+    columnIndex: number,
+  ): Promise<string> {
+    const response = await httpRequest({
+      method: "get",
+      path: `/api/projects/${projectId}/board`,
+      expectedStatus: 200,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const body = response.body as {
+      data: { columns: Array<{ _id: unknown }> };
+    };
+
+    return normalizeId(body.data.columns[columnIndex]._id);
   }
 
   beforeAll(async () => {
@@ -403,6 +420,185 @@ describe("board routes", () => {
 
       expect(boardBody.data.columns).toHaveLength(6);
       expect(boardBody.data.columns.map((column) => column.position)).toEqual([0, 1, 2, 3, 4, 5]);
+    });
+  });
+
+  describe("PUT /api/boards/:boardId/columns/:columnId", () => {
+    it("renames a column successfully", async () => {
+      const { projectId, boardId } = await createProject("Rename Test");
+      const columnId = await getColumnId(projectId, 0);
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/${columnId}`,
+        expectedStatus: 200,
+        payload: { name: "Backlog" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as {
+        data: { _id: unknown; name: string; position: number };
+      };
+
+      expect(body.data._id).toBeDefined();
+      expect(body.data.name).toBe("Backlog");
+      expect(body.data.position).toBe(0);
+
+      const boardResponse = await httpRequest({
+        method: "get",
+        path: `/api/projects/${projectId}/board`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const boardBody = boardResponse.body as {
+        data: { columns: Array<{ name: string }> };
+      };
+
+      expect(boardBody.data.columns.map((column) => column.name)).toEqual([
+        "Backlog",
+        "In Progress",
+        "In Review",
+        "Done",
+      ]);
+    });
+
+    it("returns 400 when name is missing", async () => {
+      const { projectId, boardId } = await createProject("Missing Name");
+      const columnId = await getColumnId(projectId, 0);
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/${columnId}`,
+        expectedStatus: 400,
+        payload: {},
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Column name is required");
+    });
+
+    it("returns 400 when name is empty string", async () => {
+      const { projectId, boardId } = await createProject("Empty Name");
+      const columnId = await getColumnId(projectId, 0);
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/${columnId}`,
+        expectedStatus: 400,
+        payload: { name: "" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Column name is required");
+    });
+
+    it("returns 400 when name is whitespace only", async () => {
+      const { projectId, boardId } = await createProject("WS Name");
+      const columnId = await getColumnId(projectId, 0);
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/${columnId}`,
+        expectedStatus: 400,
+        payload: { name: "   " },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Column name is required");
+    });
+
+    it("returns 404 for non-existent boardId", async () => {
+      const response = await httpRequest({
+        method: "put",
+        path: "/api/boards/aaaaaaaaaaaaaaaaaaaaaaaa/columns/bbbbbbbbbbbbbbbbbbbbbbbb",
+        expectedStatus: 404,
+        payload: { name: "Test" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Board not found");
+    });
+
+    it("returns 404 for non-existent columnId", async () => {
+      const { boardId } = await createProject("No Column");
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/bbbbbbbbbbbbbbbbbbbbbbbb`,
+        expectedStatus: 404,
+        payload: { name: "Test" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Column not found");
+    });
+
+    it("returns 400 for invalid boardId format", async () => {
+      const response = await httpRequest({
+        method: "put",
+        path: "/api/boards/not-a-valid-id/columns/bbbbbbbbbbbbbbbbbbbbbbbb",
+        expectedStatus: 400,
+        payload: { name: "Test" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Invalid board ID");
+    });
+
+    it("returns 400 for invalid columnId format", async () => {
+      const { boardId } = await createProject("Invalid Col");
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/not-a-valid-id`,
+        expectedStatus: 400,
+        payload: { name: "Test" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Invalid column ID");
+    });
+
+    it("returns 401 without auth token", async () => {
+      const response = await httpRequest({
+        method: "put",
+        path: "/api/boards/aaaaaaaaaaaaaaaaaaaaaaaa/columns/bbbbbbbbbbbbbbbbbbbbbbbb",
+        expectedStatus: 401,
+        payload: { name: "Test" },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Unauthorized");
+    });
+
+    it("does not update task statuses when column is renamed", async () => {
+      const { projectId, boardId } = await createProject("No Cascade");
+      const columnId = await getColumnId(projectId, 0);
+
+      await TaskModel.create({
+        title: "Test Task",
+        status: "To Do",
+        board: boardId,
+        project: projectId,
+      });
+
+      await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/${columnId}`,
+        expectedStatus: 200,
+        payload: { name: "Backlog" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      const task = await TaskModel.findOne({ title: "Test Task" });
+      expect(task).toBeTruthy();
+      expect(task?.status).toBe("To Do");
     });
   });
 });
