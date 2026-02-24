@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/auth-context";
+import { LoadingSpinner } from "../components/ui/loading-spinner";
+import { ErrorMessage } from "../components/ui/error-message";
 
 export function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuth();
@@ -14,7 +16,7 @@ export function LoginPage() {
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p className="text-gray-500">Loading...</p>
+        <LoadingSpinner />
       </div>
     );
   }
@@ -46,9 +48,7 @@ export function LoginPage() {
         </h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="rounded border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
-              {error}
-            </div>
+            <ErrorMessage message={error} onDismiss={() => setError("")} />
           )}
           <div>
             <label
@@ -89,7 +89,14 @@ export function LoginPage() {
             disabled={isSubmitting}
             className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSubmitting ? "Signing in..." : "Sign in"}
+            {isSubmitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <LoadingSpinner size="sm" />
+                Signing in...
+              </span>
+            ) : (
+              "Sign in"
+            )}
           </button>
         </form>
       </div>
