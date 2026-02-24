@@ -58,6 +58,32 @@ function isValidCreateColumnBody(
   return true;
 }
 
+function isValidReorderBody(
+  body: unknown,
+): body is { columnIds: string[] } {
+  if (!body || typeof body !== "object") {
+    return false;
+  }
+
+  const { columnIds } = body as Record<string, unknown>;
+
+  if (!Array.isArray(columnIds)) {
+    return false;
+  }
+
+  if (columnIds.length === 0) {
+    return false;
+  }
+
+  for (const id of columnIds) {
+    if (typeof id !== "string") {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export const columnRoutes: FastifyPluginAsync = async (app) => {
   app.post("/:boardId/columns", async (request, reply) => {
     const { boardId } = request.params as { boardId: string };
@@ -133,6 +159,96 @@ export const columnRoutes: FastifyPluginAsync = async (app) => {
       : newColumn;
 
     return reply.code(201).send({ data: columnData });
+  });
+
+  app.put("/:boardId/columns/reorder", async (request, reply) => {
+    const { boardId } = request.params as { boardId: string };
+
+    if (!isValidObjectId(boardId)) {
+      return reply.code(400).send({ error: "Invalid board ID" });
+    }
+
+    if (!isValidReorderBody(request.body)) {
+      return reply.code(400).send({ error: "columnIds must be a non-empty array of strings" });
+    }
+
+    const { columnIds } = request.body;
+    const board = await BoardModel.findOne({ _id: boardId });
+
+    if (!board) {
+      return reply.code(404).send({ error: "Board not found" });
+    }
+
+    const project = await ProjectModel.findOne({
+      _id: board.project,
+      owner: request.user.id,
+    });
+
+    if (!project) {
+      return reply.code(404).send({ error: "Board not found" });
+    }
+
+    const columns = board.columns as unknown as Array<{
+      _id: unknown;
+      name: string;
+      position: number;
+    }>;
+
+    if (columnIds.length !== columns.length) {
+      return reply.code(400).send({ error: "columnIds must include every column exactly once" });
+    }
+
+    const uniqueIds = new Set(columnIds);
+    if (uniqueIds.size !== columnIds.length) {
+      return reply.code(400).send({ error: "columnIds must include every column exactly once" });
+    }
+
+    const columnMap = new Map<string, typeof columns[number]>();
+    for (const col of columns) {
+      columnMap.set(String(col._id), col);
+    }
+
+    for (const id of columnIds) {
+      if (!columnMap.has(id)) {
+        return reply.code(400).send({ error: "columnIds must include every column exactly once" });
+      }
+    }
+
+    for (let i = 0; i < columnIds.length; i++) {
+      const column = columnMap.get(columnIds[i]);
+      if (!column) {
+        return reply.code(400).send({ error: "columnIds must include every column exactly once" });
+      }
+      column.position = i;
+    }
+
+    const boardWithSave = board as unknown as {
+      save?: () => Promise<void>;
+      columns: unknown;
+    };
+
+    if (typeof boardWithSave.save === "function") {
+      await boardWithSave.save();
+    } else {
+      await (BoardModel as unknown as {
+        findOneAndUpdate(
+          filter: Record<string, unknown>,
+          update: Record<string, unknown>,
+        ): Promise<Record<string, unknown> | null>;
+      }).findOneAndUpdate(
+        { _id: boardId },
+        { columns: boardWithSave.columns as Record<string, unknown>[] },
+      );
+    }
+
+    const boardWithToJson = board as unknown as Partial<{ toJSON(): Record<string, unknown> }>;
+    const boardJson = typeof boardWithToJson.toJSON === "function"
+      ? boardWithToJson.toJSON()
+      : (board as unknown as Record<string, unknown>);
+    const sortedColumns = boardJson.columns as Array<{ position: number }>;
+    sortedColumns.sort((a, b) => a.position - b.position);
+
+    return reply.code(200).send({ data: boardJson });
   });
 
   app.put("/:boardId/columns/:columnId", async (request, reply) => {

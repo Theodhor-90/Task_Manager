@@ -147,6 +147,20 @@ describe("board routes", () => {
     return normalizeId(body.data.columns[columnIndex]._id);
   }
 
+  async function getColumnIds(projectId: string): Promise<string[]> {
+    const response = await httpRequest({
+      method: "get",
+      path: `/api/projects/${projectId}/board`,
+      expectedStatus: 200,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const body = response.body as {
+      data: { columns: Array<{ _id: unknown }> };
+    };
+
+    return body.data.columns.map((column) => normalizeId(column._id));
+  }
+
   beforeAll(async () => {
     await setupTestDb();
     app = await buildApp();
@@ -860,6 +874,221 @@ describe("board routes", () => {
         "In Progress",
       ]);
       expect(boardBody.data.columns.map((column) => column.position)).toEqual([0, 1]);
+    });
+  });
+
+  describe("PUT /api/boards/:boardId/columns/reorder", () => {
+    it("reorders columns and updates all positions correctly", async () => {
+      const { projectId, boardId } = await createProject("Reorder Test");
+      const columnIds = await getColumnIds(projectId);
+      const reordered = [...columnIds].reverse();
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/reorder`,
+        expectedStatus: 200,
+        payload: { columnIds: reordered },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as {
+        data: { columns: Array<{ name: string; position: number }> };
+      };
+
+      expect(body.data.columns).toHaveLength(4);
+      expect(body.data.columns.map((column) => column.name)).toEqual([
+        "Done",
+        "In Review",
+        "In Progress",
+        "To Do",
+      ]);
+      expect(body.data.columns.map((column) => column.position)).toEqual([0, 1, 2, 3]);
+    });
+
+    it("persists reorder in subsequent board fetch", async () => {
+      const { projectId, boardId } = await createProject("Persist Test");
+      const columnIds = await getColumnIds(projectId);
+
+      await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/reorder`,
+        expectedStatus: 200,
+        payload: { columnIds: [...columnIds].reverse() },
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      const response = await httpRequest({
+        method: "get",
+        path: `/api/projects/${projectId}/board`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as {
+        data: { columns: Array<{ name: string; position: number }> };
+      };
+
+      expect(body.data.columns.map((column) => column.name)).toEqual([
+        "Done",
+        "In Review",
+        "In Progress",
+        "To Do",
+      ]);
+      expect(body.data.columns.map((column) => column.position)).toEqual([0, 1, 2, 3]);
+    });
+
+    it("returns 400 when columnIds is missing", async () => {
+      const { boardId } = await createProject("Missing Field");
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/reorder`,
+        expectedStatus: 400,
+        payload: {},
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("columnIds must be a non-empty array of strings");
+    });
+
+    it("returns 400 when columnIds is not an array", async () => {
+      const { boardId } = await createProject("Not Array");
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/reorder`,
+        expectedStatus: 400,
+        payload: { columnIds: "not-an-array" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("columnIds must be a non-empty array of strings");
+    });
+
+    it("returns 400 when columnIds contains extra IDs", async () => {
+      const { projectId, boardId } = await createProject("Extra IDs");
+      const columnIds = await getColumnIds(projectId);
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/reorder`,
+        expectedStatus: 400,
+        payload: { columnIds: [...columnIds, "aaaaaaaaaaaaaaaaaaaaaaaa"] },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("columnIds must include every column exactly once");
+    });
+
+    it("returns 400 when columnIds is missing IDs", async () => {
+      const { projectId, boardId } = await createProject("Missing IDs");
+      const columnIds = await getColumnIds(projectId);
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/reorder`,
+        expectedStatus: 400,
+        payload: { columnIds: [columnIds[0], columnIds[1]] },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("columnIds must include every column exactly once");
+    });
+
+    it("returns 400 when columnIds contains duplicate IDs", async () => {
+      const { projectId, boardId } = await createProject("Dup IDs");
+      const columnIds = await getColumnIds(projectId);
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/reorder`,
+        expectedStatus: 400,
+        payload: { columnIds: [columnIds[0], columnIds[0], columnIds[1], columnIds[2]] },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("columnIds must include every column exactly once");
+    });
+
+    it("returns 400 when columnIds contains IDs not on the board", async () => {
+      const { projectId, boardId } = await createProject("Bad IDs");
+      const columnIds = await getColumnIds(projectId);
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/reorder`,
+        expectedStatus: 400,
+        payload: { columnIds: [columnIds[0], columnIds[1], columnIds[2], "aaaaaaaaaaaaaaaaaaaaaaaa"] },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("columnIds must include every column exactly once");
+    });
+
+    it("returns 404 for non-existent boardId", async () => {
+      const response = await httpRequest({
+        method: "put",
+        path: "/api/boards/aaaaaaaaaaaaaaaaaaaaaaaa/columns/reorder",
+        expectedStatus: 404,
+        payload: { columnIds: ["aaaaaaaaaaaaaaaaaaaaaaaa"] },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Board not found");
+    });
+
+    it("returns 400 for invalid boardId format", async () => {
+      const response = await httpRequest({
+        method: "put",
+        path: "/api/boards/not-a-valid-id/columns/reorder",
+        expectedStatus: 400,
+        payload: { columnIds: ["aaaaaaaaaaaaaaaaaaaaaaaa"] },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Invalid board ID");
+    });
+
+    it("returns 401 without auth token", async () => {
+      const response = await httpRequest({
+        method: "put",
+        path: "/api/boards/aaaaaaaaaaaaaaaaaaaaaaaa/columns/reorder",
+        expectedStatus: 401,
+        payload: { columnIds: ["aaaaaaaaaaaaaaaaaaaaaaaa"] },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Unauthorized");
+    });
+
+    it("reorder is idempotent with same order", async () => {
+      const { projectId, boardId } = await createProject("Idempotent");
+      const columnIds = await getColumnIds(projectId);
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/boards/${boardId}/columns/reorder`,
+        expectedStatus: 200,
+        payload: { columnIds },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as {
+        data: { columns: Array<{ name: string; position: number }> };
+      };
+
+      expect(body.data.columns.map((column) => column.name)).toEqual([
+        "To Do",
+        "In Progress",
+        "In Review",
+        "Done",
+      ]);
+      expect(body.data.columns.map((column) => column.position)).toEqual([0, 1, 2, 3]);
     });
   });
 });
