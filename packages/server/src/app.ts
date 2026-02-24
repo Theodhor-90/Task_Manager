@@ -4,6 +4,7 @@ import { corsPlugin } from "./plugins/cors.plugin.js";
 import { jwtPlugin } from "./plugins/jwt.plugin.js";
 import { authMiddleware } from "./middleware/auth.middleware.js";
 import { authRoutes } from "./routes/auth.routes.js";
+import { boardRoutes, columnRoutes } from "./routes/board.routes.js";
 import { projectRoutes } from "./routes/project.routes.js";
 
 export async function buildApp() {
@@ -21,6 +22,8 @@ export async function buildApp() {
 
   await app.register(authRoutes, { prefix: "/api/auth" });
   await app.register(projectRoutes, { prefix: "/api/projects" });
+  await app.register(boardRoutes, { prefix: "/api/projects" });
+  await app.register(columnRoutes, { prefix: "/api/boards" });
 
   return app;
 }
