@@ -3,7 +3,7 @@ import { config } from "./config.js";
 import { connectDb } from "./db.js";
 import { seedDefaultUser } from "./seed.js";
 
-const app = buildApp();
+const app = await buildApp();
 
 try {
   await connectDb();
