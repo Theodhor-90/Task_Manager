@@ -303,6 +303,31 @@ function model(name: string, schema: Schema) {
       const found = getCollectionDocs(name).find((doc) => matches(doc, filter));
       return found ?? null;
     },
+    async findOneAndUpdate(
+      filter: Record<string, unknown>,
+      update: Record<string, unknown>,
+      options: Record<string, unknown> = {},
+    ): Promise<Record<string, unknown> | null> {
+      const docs = getCollectionDocs(name);
+      const index = docs.findIndex((doc) => matches(doc, filter));
+      if (index === -1) {
+        return null;
+      }
+
+      const preUpdateDoc = { ...docs[index] };
+      const fields = (update.$set ?? update) as Record<string, unknown>;
+      for (const [key, value] of Object.entries(fields)) {
+        if (key.startsWith("$")) continue;
+        docs[index][key] = value;
+      }
+
+      if (schema?.options?.timestamps) {
+        docs[index].updatedAt = new Date();
+      }
+
+      setCollectionDocs(name, docs);
+      return options.new ? docs[index] : preUpdateDoc;
+    },
     find(filter: Record<string, unknown> = {}) {
       const results = getCollectionDocs(name).filter((doc) => matches(doc, filter));
       const query = {

@@ -8,6 +8,23 @@ import { setupTestDb, teardownTestDb, clearCollections } from "../helpers/db.js"
 
 type HttpMethod = "get" | "post" | "put" | "delete";
 
+function normalizeId(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "value" in value &&
+    typeof (value as { value?: unknown }).value === "string"
+  ) {
+    return (value as { value: string }).value;
+  }
+
+  return String(value);
+}
+
 async function canBindTcpPort(): Promise<boolean> {
   return await new Promise((resolve) => {
     const server = createServer();
@@ -317,6 +334,269 @@ describe("project routes", () => {
       });
 
       expect(response.body).toEqual({ error: "Unauthorized" });
+    });
+  });
+
+  describe("GET /api/projects/:id", () => {
+    it("returns a project by ID", async () => {
+      const createResponse = await httpRequest({
+        method: "post",
+        path: "/api/projects",
+        expectedStatus: 201,
+        payload: { name: "Get Test", description: "desc" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const createBody = createResponse.body as { data: { _id: unknown } };
+      const projectId = normalizeId(createBody.data._id);
+
+      const response = await httpRequest({
+        method: "get",
+        path: `/api/projects/${projectId}`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { data: Record<string, unknown> };
+
+      expect(body.data.name).toBe("Get Test");
+      expect(body.data.description).toBe("desc");
+      expect(normalizeId(body.data._id)).toBe(projectId);
+      expect(body.data.owner).toBeDefined();
+    });
+
+    it("returns 404 for non-existent project ID", async () => {
+      const response = await httpRequest({
+        method: "get",
+        path: "/api/projects/aaaaaaaaaaaaaaaaaaaaaaaa",
+        expectedStatus: 404,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Project not found");
+    });
+
+    it("returns 400 for invalid ObjectId format", async () => {
+      const response = await httpRequest({
+        method: "get",
+        path: "/api/projects/not-a-valid-id",
+        expectedStatus: 400,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Invalid project ID");
+    });
+
+    it("returns 401 without auth token", async () => {
+      const response = await httpRequest({
+        method: "get",
+        path: "/api/projects/aaaaaaaaaaaaaaaaaaaaaaaa",
+        expectedStatus: 401,
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Unauthorized");
+    });
+  });
+
+  describe("PUT /api/projects/:id", () => {
+    it("updates project name", async () => {
+      const createResponse = await httpRequest({
+        method: "post",
+        path: "/api/projects",
+        expectedStatus: 201,
+        payload: { name: "Original" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const createBody = createResponse.body as { data: { _id: unknown } };
+      const projectId = normalizeId(createBody.data._id);
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/projects/${projectId}`,
+        expectedStatus: 200,
+        payload: { name: "Updated" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { data: Record<string, unknown> };
+
+      expect(body.data.name).toBe("Updated");
+      expect(normalizeId(body.data._id)).toBe(projectId);
+    });
+
+    it("updates project description", async () => {
+      const createResponse = await httpRequest({
+        method: "post",
+        path: "/api/projects",
+        expectedStatus: 201,
+        payload: { name: "Test", description: "old" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const createBody = createResponse.body as { data: { _id: unknown } };
+      const projectId = normalizeId(createBody.data._id);
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/projects/${projectId}`,
+        expectedStatus: 200,
+        payload: { description: "new" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { data: Record<string, unknown> };
+
+      expect(body.data.description).toBe("new");
+      expect(body.data.name).toBe("Test");
+    });
+
+    it("updates both name and description", async () => {
+      const createResponse = await httpRequest({
+        method: "post",
+        path: "/api/projects",
+        expectedStatus: 201,
+        payload: { name: "Before", description: "Before Desc" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const createBody = createResponse.body as { data: { _id: unknown } };
+      const projectId = normalizeId(createBody.data._id);
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/projects/${projectId}`,
+        expectedStatus: 200,
+        payload: { name: "New Name", description: "New Desc" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { data: Record<string, unknown> };
+
+      expect(body.data.name).toBe("New Name");
+      expect(body.data.description).toBe("New Desc");
+    });
+
+    it("ignores extraneous fields", async () => {
+      const createResponse = await httpRequest({
+        method: "post",
+        path: "/api/projects",
+        expectedStatus: 201,
+        payload: { name: "Security Test" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const createBody = createResponse.body as {
+        data: { _id: unknown; owner: string };
+      };
+      const projectId = normalizeId(createBody.data._id);
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/projects/${projectId}`,
+        expectedStatus: 200,
+        payload: { name: "Renamed", owner: "aaaaaaaaaaaaaaaaaaaaaaaa" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { data: Record<string, unknown> };
+
+      expect(body.data.name).toBe("Renamed");
+      expect(body.data.owner).toBe(createBody.data.owner);
+    });
+
+    it("returns 404 for non-existent project ID", async () => {
+      const response = await httpRequest({
+        method: "put",
+        path: "/api/projects/aaaaaaaaaaaaaaaaaaaaaaaa",
+        expectedStatus: 404,
+        payload: { name: "Test" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Project not found");
+    });
+
+    it("returns 400 for invalid ObjectId format", async () => {
+      const response = await httpRequest({
+        method: "put",
+        path: "/api/projects/not-a-valid-id",
+        expectedStatus: 400,
+        payload: { name: "Test" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Invalid project ID");
+    });
+
+    it("returns 400 when no valid update fields provided", async () => {
+      const createResponse = await httpRequest({
+        method: "post",
+        path: "/api/projects",
+        expectedStatus: 201,
+        payload: { name: "No Update Fields" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const createBody = createResponse.body as { data: { _id: unknown } };
+      const projectId = normalizeId(createBody.data._id);
+
+      const response = await httpRequest({
+        method: "put",
+        path: `/api/projects/${projectId}`,
+        expectedStatus: 400,
+        payload: {},
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toContain("Name or description");
+    });
+
+    it("returns 400 when name is empty string", async () => {
+      const createResponse = await httpRequest({
+        method: "post",
+        path: "/api/projects",
+        expectedStatus: 201,
+        payload: { name: "Empty Name Check" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const createBody = createResponse.body as { data: { _id: unknown } };
+      const projectId = normalizeId(createBody.data._id);
+
+      await httpRequest({
+        method: "put",
+        path: `/api/projects/${projectId}`,
+        expectedStatus: 400,
+        payload: { name: "" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+    });
+
+    it("returns 400 when name is whitespace only", async () => {
+      const createResponse = await httpRequest({
+        method: "post",
+        path: "/api/projects",
+        expectedStatus: 201,
+        payload: { name: "Whitespace Check" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const createBody = createResponse.body as { data: { _id: unknown } };
+      const projectId = normalizeId(createBody.data._id);
+
+      await httpRequest({
+        method: "put",
+        path: `/api/projects/${projectId}`,
+        expectedStatus: 400,
+        payload: { name: "   " },
+        headers: { authorization: `Bearer ${token}` },
+      });
+    });
+
+    it("returns 401 without auth token", async () => {
+      const response = await httpRequest({
+        method: "put",
+        path: "/api/projects/aaaaaaaaaaaaaaaaaaaaaaaa",
+        expectedStatus: 401,
+        payload: { name: "Test" },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Unauthorized");
     });
   });
 });
