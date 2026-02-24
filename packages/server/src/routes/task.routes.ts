@@ -161,8 +161,64 @@ export const boardTaskRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(501).send({ error: "Not implemented" });
   });
 
-  app.post("/:boardId/tasks", async (_request, reply) => {
-    return reply.code(501).send({ error: "Not implemented" });
+  app.post("/:boardId/tasks", async (request, reply) => {
+    const { boardId } = request.params as { boardId: string };
+
+    if (!isValidObjectId(boardId)) {
+      return reply.code(400).send({ error: "Invalid board ID" });
+    }
+
+    if (!isValidCreateTaskBody(request.body)) {
+      return reply.code(400).send({ error: "Title is required" });
+    }
+
+    const board = await BoardModel.findOne({ _id: boardId });
+
+    if (!board) {
+      return reply.code(404).send({ error: "Board not found" });
+    }
+
+    const project = await ProjectModel.findOne({
+      _id: board.project,
+      owner: request.user.id,
+    });
+
+    if (!project) {
+      return reply.code(404).send({ error: "Board not found" });
+    }
+
+    const { title, description, priority, dueDate, labels, status } = request.body;
+    const columns = board.columns as unknown as Array<{
+      _id: unknown;
+      name: string;
+      position: number;
+    }>;
+    const columnNames = columns.map((column) => column.name);
+
+    if (status !== undefined && !columnNames.includes(status)) {
+      return reply.code(400).send({ error: "Invalid status: does not match any column" });
+    }
+
+    const sortedColumns = [...columns].sort((a, b) => a.position - b.position);
+    const resolvedStatus = status ?? sortedColumns[0].name;
+    const resolvedPriority = priority ?? "medium";
+    const position = await (TaskModel as unknown as {
+      countDocuments(filter: Record<string, unknown>): Promise<number>;
+    }).countDocuments({ board: boardId, status: resolvedStatus });
+
+    const task = await TaskModel.create({
+      title,
+      description,
+      status: resolvedStatus,
+      priority: resolvedPriority,
+      position,
+      dueDate: dueDate ?? null,
+      labels: labels ?? [],
+      board: boardId,
+      project: board.project,
+    } as Record<string, unknown>);
+
+    return reply.code(201).send({ data: task });
   });
 };
 
