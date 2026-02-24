@@ -88,6 +88,19 @@ function normalizeForCompare(value: unknown): unknown {
 
 function matches(doc: Record<string, unknown>, filter: Record<string, unknown> = {}): boolean {
   return Object.entries(filter).every(([key, value]) => {
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value) &&
+      !(value instanceof ObjectId)
+    ) {
+      const operators = value as Record<string, unknown>;
+      if ("$in" in operators) {
+        const list = operators.$in as unknown[];
+        const docVal = normalizeForCompare(doc[key]);
+        return list.some((item) => normalizeForCompare(item) === docVal);
+      }
+    }
     return normalizeForCompare(doc[key]) === normalizeForCompare(value);
   });
 }
@@ -375,6 +388,16 @@ function model(name: string, schema: Schema) {
       const deletedCount = docs.length - kept.length;
       setCollectionDocs(name, kept);
       return { deletedCount };
+    },
+    async deleteOne(filter: Record<string, unknown> = {}): Promise<{ deletedCount: number }> {
+      const docs = getCollectionDocs(name);
+      const index = docs.findIndex((doc) => matches(doc, filter));
+      if (index === -1) {
+        return { deletedCount: 0 };
+      }
+      docs.splice(index, 1);
+      setCollectionDocs(name, docs);
+      return { deletedCount: 1 };
     },
   };
 }

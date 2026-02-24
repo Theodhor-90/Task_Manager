@@ -3,7 +3,15 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import request from "supertest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../src/app.js";
-import { BoardModel, UserModel, hashPassword } from "../../src/models/index.js";
+import {
+  BoardModel,
+  UserModel,
+  hashPassword,
+  TaskModel,
+  CommentModel,
+  LabelModel,
+  ProjectModel,
+} from "../../src/models/index.js";
 import { setupTestDb, teardownTestDb, clearCollections } from "../helpers/db.js";
 
 type HttpMethod = "get" | "post" | "put" | "delete";
@@ -593,6 +601,159 @@ describe("project routes", () => {
         path: "/api/projects/aaaaaaaaaaaaaaaaaaaaaaaa",
         expectedStatus: 401,
         payload: { name: "Test" },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Unauthorized");
+    });
+  });
+
+  describe("DELETE /api/projects/:id", () => {
+    it("deletes a project and returns success message", async () => {
+      const createResponse = await httpRequest({
+        method: "post",
+        path: "/api/projects",
+        expectedStatus: 201,
+        payload: { name: "Delete Me" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const createBody = createResponse.body as { data: { _id: unknown } };
+      const projectId = normalizeId(createBody.data._id);
+
+      const response = await httpRequest({
+        method: "delete",
+        path: `/api/projects/${projectId}`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { data: { message: string } };
+
+      expect(body.data.message).toBe("Project deleted");
+
+      const getResponse = await httpRequest({
+        method: "get",
+        path: `/api/projects/${projectId}`,
+        expectedStatus: 404,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const getBody = getResponse.body as { error: string };
+
+      expect(getBody.error).toBe("Project not found");
+    });
+
+    it("cascade deletes board, tasks, comments, and labels", async () => {
+      const createResponse = await httpRequest({
+        method: "post",
+        path: "/api/projects",
+        expectedStatus: 201,
+        payload: { name: "Cascade Test" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const createBody = createResponse.body as { data: { _id: unknown } };
+      const projectId = normalizeId(createBody.data._id);
+
+      const board = await BoardModel.findOne({ project: projectId as never });
+      expect(board).not.toBeNull();
+      const boardId = normalizeId(board?._id);
+
+      const user = await UserModel.findOne({ email: "admin@taskboard.local" });
+      expect(user).not.toBeNull();
+      const userId = normalizeId(user?._id);
+
+      const task = await TaskModel.create({
+        title: "Task 1",
+        status: "To Do",
+        board: boardId,
+        project: projectId,
+      });
+      const taskId = normalizeId(task._id);
+
+      await CommentModel.create({
+        body: "A comment",
+        task: taskId,
+        author: userId,
+      });
+
+      await LabelModel.create({
+        name: "Bug",
+        color: "#ef4444",
+        project: projectId,
+      });
+
+      await httpRequest({
+        method: "delete",
+        path: `/api/projects/${projectId}`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      const project = await ProjectModel.findOne({ _id: projectId as never });
+      const deletedBoard = await BoardModel.findOne({ project: projectId as never });
+      const taskCount = await TaskModel.countDocuments({ board: boardId as never });
+      const commentCount = await CommentModel.countDocuments({ task: taskId as never });
+      const labelCount = await LabelModel.countDocuments({ project: projectId as never });
+
+      expect(project).toBeNull();
+      expect(deletedBoard).toBeNull();
+      expect(taskCount).toBe(0);
+      expect(commentCount).toBe(0);
+      expect(labelCount).toBe(0);
+    });
+
+    it("deletes a project with no tasks/comments/labels (only board)", async () => {
+      const createResponse = await httpRequest({
+        method: "post",
+        path: "/api/projects",
+        expectedStatus: 201,
+        payload: { name: "Board Only" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const createBody = createResponse.body as { data: { _id: unknown } };
+      const projectId = normalizeId(createBody.data._id);
+
+      const response = await httpRequest({
+        method: "delete",
+        path: `/api/projects/${projectId}`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { data: { message: string } };
+
+      expect(body.data.message).toBe("Project deleted");
+
+      const board = await BoardModel.findOne({ project: projectId as never });
+      expect(board).toBeNull();
+    });
+
+    it("returns 404 for non-existent project ID", async () => {
+      const response = await httpRequest({
+        method: "delete",
+        path: "/api/projects/aaaaaaaaaaaaaaaaaaaaaaaa",
+        expectedStatus: 404,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Project not found");
+    });
+
+    it("returns 400 for invalid ObjectId format", async () => {
+      const response = await httpRequest({
+        method: "delete",
+        path: "/api/projects/not-a-valid-id",
+        expectedStatus: 400,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Invalid project ID");
+    });
+
+    it("returns 401 without auth token", async () => {
+      const response = await httpRequest({
+        method: "delete",
+        path: "/api/projects/aaaaaaaaaaaaaaaaaaaaaaaa",
+        expectedStatus: 401,
       });
       const body = response.body as { error: string };
 

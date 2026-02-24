@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import mongoose from "mongoose";
 import { DEFAULT_COLUMNS } from "@taskboard/shared";
-import { BoardModel, ProjectModel } from "../models/index.js";
+import { BoardModel, ProjectModel, TaskModel, CommentModel, LabelModel } from "../models/index.js";
 
 type FindProjectsModel = {
   find(filter: Record<string, unknown>): {
@@ -162,5 +162,47 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     return reply.code(200).send({ data: updatedProject });
+  });
+
+  app.delete("/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    if (!isValidObjectId(id)) {
+      return reply.code(400).send({ error: "Invalid project ID" });
+    }
+
+    const project = await ProjectModel.findOne({
+      _id: id,
+      owner: request.user.id,
+    });
+
+    if (!project) {
+      return reply.code(404).send({ error: "Project not found" });
+    }
+
+    const board = await BoardModel.findOne({ project: id });
+
+    if (board) {
+      const tasks = await (TaskModel as unknown as FindProjectsModel)
+        .find({ board: board._id })
+        .sort({ createdAt: 1 });
+
+      const taskIds = (tasks as Record<string, unknown>[]).map((task) => task._id);
+
+      if (taskIds.length > 0) {
+        await CommentModel.deleteMany({ task: { $in: taskIds } } as Record<string, unknown>);
+      }
+      await TaskModel.deleteMany({ board: board._id } as Record<string, unknown>);
+      await LabelModel.deleteMany({ project: id } as Record<string, unknown>);
+      await (BoardModel as unknown as { deleteOne(filter: Record<string, unknown>): Promise<{ deletedCount: number }> })
+        .deleteOne({ _id: board._id });
+    } else {
+      await LabelModel.deleteMany({ project: id } as Record<string, unknown>);
+    }
+
+    await (ProjectModel as unknown as { deleteOne(filter: Record<string, unknown>): Promise<{ deletedCount: number }> })
+      .deleteOne({ _id: id });
+
+    return reply.code(200).send({ data: { message: "Project deleted" } });
   });
 };
