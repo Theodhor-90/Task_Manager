@@ -4,6 +4,7 @@ import { corsPlugin } from "./plugins/cors.plugin.js";
 import { jwtPlugin } from "./plugins/jwt.plugin.js";
 import { authMiddleware } from "./middleware/auth.middleware.js";
 import { authRoutes } from "./routes/auth.routes.js";
+import { projectRoutes } from "./routes/project.routes.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -19,6 +20,7 @@ export async function buildApp() {
   });
 
   await app.register(authRoutes, { prefix: "/api/auth" });
+  await app.register(projectRoutes, { prefix: "/api/projects" });
 
   return app;
 }
