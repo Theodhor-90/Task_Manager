@@ -601,4 +601,265 @@ describe("board routes", () => {
       expect(task?.status).toBe("To Do");
     });
   });
+
+  describe("DELETE /api/boards/:boardId/columns/:columnId", () => {
+    it("deletes a column with no tasks", async () => {
+      const { projectId, boardId } = await createProject("Delete Test");
+      const columnId = await getColumnId(projectId, 2);
+
+      const response = await httpRequest({
+        method: "delete",
+        path: `/api/boards/${boardId}/columns/${columnId}`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { data: { message: string } };
+
+      expect(body.data.message).toBe("Column deleted");
+
+      const boardResponse = await httpRequest({
+        method: "get",
+        path: `/api/projects/${projectId}/board`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const boardBody = boardResponse.body as {
+        data: { columns: Array<{ name: string; position: number }> };
+      };
+
+      expect(boardBody.data.columns).toHaveLength(3);
+      expect(boardBody.data.columns.map((column) => column.name)).toEqual([
+        "To Do",
+        "In Progress",
+        "Done",
+      ]);
+      expect(boardBody.data.columns.map((column) => column.position)).toEqual([0, 1, 2]);
+    });
+
+    it("returns 400 when tasks exist with matching status", async () => {
+      const { projectId, boardId } = await createProject("Task Guard");
+      const columnId = await getColumnId(projectId, 0);
+
+      await TaskModel.create({
+        title: "Blocking Task",
+        status: "To Do",
+        board: boardId,
+        project: projectId,
+      });
+
+      const response = await httpRequest({
+        method: "delete",
+        path: `/api/boards/${boardId}/columns/${columnId}`,
+        expectedStatus: 400,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Cannot delete column that contains tasks");
+
+      const boardResponse = await httpRequest({
+        method: "get",
+        path: `/api/projects/${projectId}/board`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const boardBody = boardResponse.body as {
+        data: { columns: Array<{ name: string; position: number }> };
+      };
+
+      expect(boardBody.data.columns).toHaveLength(4);
+    });
+
+    it("reindexes remaining column positions after delete", async () => {
+      const { projectId, boardId } = await createProject("Reindex Test");
+      const columnId = await getColumnId(projectId, 1);
+
+      await httpRequest({
+        method: "delete",
+        path: `/api/boards/${boardId}/columns/${columnId}`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      const boardResponse = await httpRequest({
+        method: "get",
+        path: `/api/projects/${projectId}/board`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const boardBody = boardResponse.body as {
+        data: { columns: Array<{ name: string; position: number }> };
+      };
+
+      expect(boardBody.data.columns).toHaveLength(3);
+      expect(boardBody.data.columns.map((column) => column.name)).toEqual([
+        "To Do",
+        "In Review",
+        "Done",
+      ]);
+      expect(boardBody.data.columns.map((column) => column.position)).toEqual([0, 1, 2]);
+    });
+
+    it("returns 404 for non-existent boardId", async () => {
+      const response = await httpRequest({
+        method: "delete",
+        path: "/api/boards/aaaaaaaaaaaaaaaaaaaaaaaa/columns/bbbbbbbbbbbbbbbbbbbbbbbb",
+        expectedStatus: 404,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Board not found");
+    });
+
+    it("returns 404 for non-existent columnId", async () => {
+      const { boardId } = await createProject("No Column");
+
+      const response = await httpRequest({
+        method: "delete",
+        path: `/api/boards/${boardId}/columns/bbbbbbbbbbbbbbbbbbbbbbbb`,
+        expectedStatus: 404,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Column not found");
+    });
+
+    it("returns 400 for invalid boardId format", async () => {
+      const response = await httpRequest({
+        method: "delete",
+        path: "/api/boards/not-a-valid-id/columns/bbbbbbbbbbbbbbbbbbbbbbbb",
+        expectedStatus: 400,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Invalid board ID");
+    });
+
+    it("returns 400 for invalid columnId format", async () => {
+      const { boardId } = await createProject("Invalid Col");
+
+      const response = await httpRequest({
+        method: "delete",
+        path: `/api/boards/${boardId}/columns/not-a-valid-id`,
+        expectedStatus: 400,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Invalid column ID");
+    });
+
+    it("returns 401 without auth token", async () => {
+      const response = await httpRequest({
+        method: "delete",
+        path: "/api/boards/aaaaaaaaaaaaaaaaaaaaaaaa/columns/bbbbbbbbbbbbbbbbbbbbbbbb",
+        expectedStatus: 401,
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Unauthorized");
+    });
+
+    it("allows deleting column after tasks are moved away", async () => {
+      const { projectId, boardId } = await createProject("Move Away");
+      const columnId = await getColumnId(projectId, 0);
+
+      await TaskModel.create({
+        title: "Movable Task",
+        status: "To Do",
+        board: boardId,
+        project: projectId,
+      });
+
+      await httpRequest({
+        method: "delete",
+        path: `/api/boards/${boardId}/columns/${columnId}`,
+        expectedStatus: 400,
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      await TaskModel.findOneAndUpdate(
+        { title: "Movable Task" },
+        { status: "In Progress" },
+      );
+
+      await httpRequest({
+        method: "delete",
+        path: `/api/boards/${boardId}/columns/${columnId}`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      const boardResponse = await httpRequest({
+        method: "get",
+        path: `/api/projects/${projectId}/board`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const boardBody = boardResponse.body as {
+        data: { columns: Array<{ name: string; position: number }> };
+      };
+
+      expect(boardBody.data.columns).toHaveLength(3);
+      expect(boardBody.data.columns.map((column) => column.name)).toEqual([
+        "In Progress",
+        "In Review",
+        "Done",
+      ]);
+    });
+
+    it("can delete multiple columns sequentially", async () => {
+      const { projectId, boardId } = await createProject("Multi Delete");
+      const inReviewId = await getColumnId(projectId, 2);
+
+      await httpRequest({
+        method: "delete",
+        path: `/api/boards/${boardId}/columns/${inReviewId}`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      let boardResponse = await httpRequest({
+        method: "get",
+        path: `/api/projects/${projectId}/board`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      let boardBody = boardResponse.body as {
+        data: { columns: Array<{ _id: unknown; name: string; position: number }> };
+      };
+
+      expect(boardBody.data.columns).toHaveLength(3);
+      expect(boardBody.data.columns.map((column) => column.position)).toEqual([0, 1, 2]);
+
+      const doneId = normalizeId(boardBody.data.columns[2]._id);
+
+      await httpRequest({
+        method: "delete",
+        path: `/api/boards/${boardId}/columns/${doneId}`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      boardResponse = await httpRequest({
+        method: "get",
+        path: `/api/projects/${projectId}/board`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      boardBody = boardResponse.body as {
+        data: { columns: Array<{ _id: unknown; name: string; position: number }> };
+      };
+
+      expect(boardBody.data.columns).toHaveLength(2);
+      expect(boardBody.data.columns.map((column) => column.name)).toEqual([
+        "To Do",
+        "In Progress",
+      ]);
+      expect(boardBody.data.columns.map((column) => column.position)).toEqual([0, 1]);
+    });
+  });
 });
