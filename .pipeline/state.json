@@ -339,16 +339,16 @@
         "totalAttempts": 2,
         "tiebreakerUsed": true
       },
-      "currentPhase": "p01",
+      "currentPhase": "p02",
       "phases": {
         "p01": {
-          "status": "in_progress",
+          "status": "completed",
           "planning": {
             "iteration": 1,
             "totalAttempts": 1,
             "tiebreakerUsed": false
           },
-          "currentTask": "t05",
+          "currentTask": null,
           "tasks": {
             "t01": {
               "status": "completed",
@@ -418,14 +418,93 @@
           }
         },
         "p02": {
-          "status": "pending",
+          "status": "spec_locked",
           "planning": {
-            "iteration": 0,
-            "totalAttempts": 0,
+            "iteration": 1,
+            "totalAttempts": 1,
             "tiebreakerUsed": false
           },
           "currentTask": null,
-          "tasks": {}
+          "tasks": {
+            "t01": {
+              "status": "pending",
+              "planning": {
+                "iteration": 0,
+                "totalAttempts": 0,
+                "tiebreakerUsed": false
+              },
+              "implementation": {
+                "iteration": 0,
+                "totalAttempts": 0,
+                "tiebreakerUsed": false
+              }
+            },
+            "t02": {
+              "status": "pending",
+              "planning": {
+                "iteration": 0,
+                "totalAttempts": 0,
+                "tiebreakerUsed": false
+              },
+              "implementation": {
+                "iteration": 0,
+                "totalAttempts": 0,
+                "tiebreakerUsed": false
+              }
+            },
+            "t03": {
+              "status": "pending",
+              "planning": {
+                "iteration": 0,
+                "totalAttempts": 0,
+                "tiebreakerUsed": false
+              },
+              "implementation": {
+                "iteration": 0,
+                "totalAttempts": 0,
+                "tiebreakerUsed": false
+              }
+            },
+            "t04": {
+              "status": "pending",
+              "planning": {
+                "iteration": 0,
+                "totalAttempts": 0,
+                "tiebreakerUsed": false
+              },
+              "implementation": {
+                "iteration": 0,
+                "totalAttempts": 0,
+                "tiebreakerUsed": false
+              }
+            },
+            "t05": {
+              "status": "pending",
+              "planning": {
+                "iteration": 0,
+                "totalAttempts": 0,
+                "tiebreakerUsed": false
+              },
+              "implementation": {
+                "iteration": 0,
+                "totalAttempts": 0,
+                "tiebreakerUsed": false
+              }
+            },
+            "t06": {
+              "status": "pending",
+              "planning": {
+                "iteration": 0,
+                "totalAttempts": 0,
+                "tiebreakerUsed": false
+              },
+              "implementation": {
+                "iteration": 0,
+                "totalAttempts": 0,
+                "tiebreakerUsed": false
+              }
+            }
+          }
         },
         "p03": {
           "status": "pending",
