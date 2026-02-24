@@ -7,6 +7,8 @@ import { authRoutes } from "./routes/auth.routes.js";
 import { boardRoutes, columnRoutes } from "./routes/board.routes.js";
 import { projectRoutes } from "./routes/project.routes.js";
 import { boardTaskRoutes, taskRoutes } from "./routes/task.routes.js";
+import { taskCommentRoutes, commentRoutes } from "./routes/comment.routes.js";
+import { projectLabelRoutes, labelRoutes } from "./routes/label.routes.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -27,6 +29,10 @@ export async function buildApp() {
   await app.register(columnRoutes, { prefix: "/api/boards" });
   await app.register(boardTaskRoutes, { prefix: "/api/boards" });
   await app.register(taskRoutes, { prefix: "/api/tasks" });
+  await app.register(taskCommentRoutes, { prefix: "/api/tasks" });
+  await app.register(commentRoutes, { prefix: "/api/comments" });
+  await app.register(projectLabelRoutes, { prefix: "/api/projects" });
+  await app.register(labelRoutes, { prefix: "/api/labels" });
 
   return app;
 }
