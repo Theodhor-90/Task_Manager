@@ -306,8 +306,138 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(200).send({ data: task });
   });
 
-  app.put("/:id/move", async (_request, reply) => {
-    return reply.code(501).send({ error: "Not implemented" });
+  app.put("/:id/move", async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    if (!isValidObjectId(id)) {
+      return reply.code(400).send({ error: "Invalid task ID" });
+    }
+
+    if (!isValidMoveTaskBody(request.body)) {
+      return reply.code(400).send({ error: "Position is required and must be a non-negative integer" });
+    }
+
+    const { position, status } = request.body;
+    const task = await TaskModel.findOne({ _id: id });
+
+    if (!task) {
+      return reply.code(404).send({ error: "Task not found" });
+    }
+
+    const board = await BoardModel.findOne({ _id: task.board });
+
+    if (!board) {
+      return reply.code(404).send({ error: "Task not found" });
+    }
+
+    const project = await ProjectModel.findOne({
+      _id: board.project,
+      owner: request.user.id,
+    });
+
+    if (!project) {
+      return reply.code(404).send({ error: "Task not found" });
+    }
+
+    const columns = board.columns as unknown as Array<{
+      _id: unknown;
+      name: string;
+      position: number;
+    }>;
+    const columnNames = columns.map((col) => col.name);
+    const sourceStatus = task.status as string;
+    const targetStatus = status ?? sourceStatus;
+
+    if (!columnNames.includes(targetStatus)) {
+      return reply.code(400).send({ error: "Invalid status: does not match any column" });
+    }
+
+    const isCrossColumnMove = targetStatus !== sourceStatus;
+    const sourceTasks = await (TaskModel as unknown as {
+      find(filter: Record<string, unknown>): {
+        sort(sortObj: Record<string, number>): Promise<Array<{ _id: unknown; position: number }>>;
+      };
+    }).find({ board: task.board, status: sourceStatus, _id: { $ne: id } }).sort({ position: 1 });
+
+    for (let i = 0; i < sourceTasks.length; i++) {
+      if (sourceTasks[i].position !== i) {
+        await (TaskModel as unknown as {
+          findOneAndUpdate(
+            filter: Record<string, unknown>,
+            update: Record<string, unknown>,
+            options: Record<string, unknown>,
+          ): Promise<Record<string, unknown> | null>;
+        }).findOneAndUpdate(
+          { _id: sourceTasks[i]._id },
+          { position: i },
+          { new: true },
+        );
+      }
+    }
+
+    let destinationCount: number;
+
+    if (isCrossColumnMove) {
+      destinationCount = await (TaskModel as unknown as {
+        countDocuments(filter: Record<string, unknown>): Promise<number>;
+      }).countDocuments({ board: task.board, status: targetStatus });
+    } else {
+      destinationCount = sourceTasks.length;
+    }
+
+    const clampedPosition = Math.min(position, destinationCount);
+
+    if (isCrossColumnMove) {
+      const destTasks = await (TaskModel as unknown as {
+        find(filter: Record<string, unknown>): {
+          sort(sortObj: Record<string, number>): Promise<Array<{ _id: unknown; position: number }>>;
+        };
+      }).find({ board: task.board, status: targetStatus, position: { $gte: clampedPosition } }).sort({
+        position: 1,
+      });
+
+      for (const destTask of destTasks) {
+        await (TaskModel as unknown as {
+          findOneAndUpdate(
+            filter: Record<string, unknown>,
+            update: Record<string, unknown>,
+            options: Record<string, unknown>,
+          ): Promise<Record<string, unknown> | null>;
+        }).findOneAndUpdate(
+          { _id: destTask._id },
+          { position: destTask.position + 1 },
+          { new: true },
+        );
+      }
+    } else {
+      for (let i = sourceTasks.length - 1; i >= clampedPosition; i--) {
+        await (TaskModel as unknown as {
+          findOneAndUpdate(
+            filter: Record<string, unknown>,
+            update: Record<string, unknown>,
+            options: Record<string, unknown>,
+          ): Promise<Record<string, unknown> | null>;
+        }).findOneAndUpdate(
+          { _id: sourceTasks[i]._id },
+          { position: i + 1 },
+          { new: true },
+        );
+      }
+    }
+
+    const updatedTask = await (TaskModel as unknown as {
+      findOneAndUpdate(
+        filter: Record<string, unknown>,
+        update: Record<string, unknown>,
+        options: Record<string, unknown>,
+      ): Promise<Record<string, unknown> | null>;
+    }).findOneAndUpdate(
+      { _id: id },
+      { status: targetStatus, position: clampedPosition },
+      { new: true },
+    );
+
+    return reply.code(200).send({ data: updatedTask });
   });
 
   app.put("/:id", async (request, reply) => {
