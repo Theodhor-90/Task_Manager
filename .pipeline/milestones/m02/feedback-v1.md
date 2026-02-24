@@ -1,0 +1,1 @@
+{"verdict":"needs_revision","feedback":"Exit Criterion #1 states \"All 19 endpoints from master plan Sections 5.2–5.7\" but the master plan defines 24 endpoints (5 Projects + 1 Board + 4 Columns + 6 Tasks + 4 Comments + 4 Labels = 24). Update the count to 24."}
