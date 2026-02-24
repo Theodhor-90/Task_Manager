@@ -42,6 +42,96 @@ export const boardRoutes: FastifyPluginAsync = async (app) => {
   });
 };
 
-export const columnRoutes: FastifyPluginAsync = async (_app) => {
-  // Column endpoints will be added in Tasks 2-5
+function isValidCreateColumnBody(
+  body: unknown,
+): body is { name: string } {
+  if (!body || typeof body !== "object") {
+    return false;
+  }
+
+  const { name } = body as Record<string, unknown>;
+
+  if (typeof name !== "string" || name.trim().length === 0) {
+    return false;
+  }
+
+  return true;
+}
+
+export const columnRoutes: FastifyPluginAsync = async (app) => {
+  app.post("/:boardId/columns", async (request, reply) => {
+    const { boardId } = request.params as { boardId: string };
+
+    if (!isValidObjectId(boardId)) {
+      return reply.code(400).send({ error: "Invalid board ID" });
+    }
+
+    if (!isValidCreateColumnBody(request.body)) {
+      return reply.code(400).send({ error: "Column name is required" });
+    }
+
+    const { name } = request.body;
+    const board = await BoardModel.findOne({ _id: boardId });
+
+    if (!board) {
+      return reply.code(404).send({ error: "Board not found" });
+    }
+
+    const project = await ProjectModel.findOne({
+      _id: board.project,
+      owner: request.user.id,
+    });
+
+    if (!project) {
+      return reply.code(404).send({ error: "Board not found" });
+    }
+
+    const position = board.columns.length;
+    const columns = board.columns as unknown as Array<{
+      _id?: unknown;
+      name: string;
+      position: number;
+    }>;
+    columns.push({
+      name,
+      position,
+    });
+    const newColumn = columns[columns.length - 1] as {
+      _id?: unknown;
+      name: string;
+      position: number;
+      toJSON?: () => Record<string, unknown>;
+    };
+
+    if (newColumn._id === undefined) {
+      newColumn._id = new (mongoose as unknown as {
+        Types: { ObjectId: new () => { toString(): string } };
+      }).Types.ObjectId();
+    }
+    const boardWithSave = board as unknown as {
+      save?: () => Promise<void>;
+      columns: unknown;
+    };
+
+    if (typeof boardWithSave.save === "function") {
+      await boardWithSave.save();
+    } else {
+      await (BoardModel as unknown as {
+        findOneAndUpdate(
+          filter: Record<string, unknown>,
+          update: Record<string, unknown>,
+        ): Promise<Record<string, unknown> | null>;
+      }).findOneAndUpdate(
+        { _id: boardId },
+        { columns: boardWithSave.columns as Record<string, unknown>[] },
+      );
+    }
+
+    const columnWithToJson = newColumn as unknown as Partial<{ toJSON(): Record<string, unknown> }>;
+    const columnData = typeof columnWithToJson.toJSON === "function"
+      ? columnWithToJson.toJSON()
+      : newColumn;
+
+    return reply.code(201).send({ data: columnData });
+  });
 };

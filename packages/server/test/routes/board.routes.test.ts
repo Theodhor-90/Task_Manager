@@ -246,4 +246,163 @@ describe("board routes", () => {
       expect(body.data.updatedAt).toBeDefined();
     });
   });
+
+  describe("POST /api/boards/:boardId/columns", () => {
+    it("adds a column at the end with correct position", async () => {
+      const { projectId, boardId } = await createProject("Column Test");
+
+      const response = await httpRequest({
+        method: "post",
+        path: `/api/boards/${boardId}/columns`,
+        expectedStatus: 201,
+        payload: { name: "QA" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as {
+        data: { _id: string; name: string; position: number };
+      };
+
+      expect(body.data._id).toBeDefined();
+      expect(body.data.name).toBe("QA");
+      expect(body.data.position).toBe(4);
+
+      const boardResponse = await httpRequest({
+        method: "get",
+        path: `/api/projects/${projectId}/board`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const boardBody = boardResponse.body as {
+        data: { columns: Array<{ name: string; position: number }> };
+      };
+
+      expect(boardBody.data.columns).toHaveLength(5);
+      expect(boardBody.data.columns[4].name).toBe("QA");
+      expect(boardBody.data.columns[4].position).toBe(4);
+    });
+
+    it("returns 400 when name is missing", async () => {
+      const { boardId } = await createProject("Missing Name");
+
+      const response = await httpRequest({
+        method: "post",
+        path: `/api/boards/${boardId}/columns`,
+        expectedStatus: 400,
+        payload: {},
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Column name is required");
+    });
+
+    it("returns 400 when name is empty string", async () => {
+      const { boardId } = await createProject("Empty Name");
+
+      const response = await httpRequest({
+        method: "post",
+        path: `/api/boards/${boardId}/columns`,
+        expectedStatus: 400,
+        payload: { name: "" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Column name is required");
+    });
+
+    it("returns 400 when name is whitespace only", async () => {
+      const { boardId } = await createProject("WS Name");
+
+      const response = await httpRequest({
+        method: "post",
+        path: `/api/boards/${boardId}/columns`,
+        expectedStatus: 400,
+        payload: { name: "   " },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Column name is required");
+    });
+
+    it("returns 404 for non-existent boardId", async () => {
+      const response = await httpRequest({
+        method: "post",
+        path: "/api/boards/aaaaaaaaaaaaaaaaaaaaaaaa/columns",
+        expectedStatus: 404,
+        payload: { name: "Test" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Board not found");
+    });
+
+    it("returns 400 for invalid boardId format", async () => {
+      const response = await httpRequest({
+        method: "post",
+        path: "/api/boards/not-a-valid-id/columns",
+        expectedStatus: 400,
+        payload: { name: "Test" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Invalid board ID");
+    });
+
+    it("returns 401 without auth token", async () => {
+      const response = await httpRequest({
+        method: "post",
+        path: "/api/boards/aaaaaaaaaaaaaaaaaaaaaaaa/columns",
+        expectedStatus: 401,
+        payload: { name: "Test" },
+      });
+      const body = response.body as { error: string };
+
+      expect(body.error).toBe("Unauthorized");
+    });
+
+    it("can add multiple columns sequentially", async () => {
+      const { projectId, boardId } = await createProject("Multi");
+
+      const firstResponse = await httpRequest({
+        method: "post",
+        path: `/api/boards/${boardId}/columns`,
+        expectedStatus: 201,
+        payload: { name: "QA" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const firstBody = firstResponse.body as {
+        data: { position: number };
+      };
+      expect(firstBody.data.position).toBe(4);
+
+      const secondResponse = await httpRequest({
+        method: "post",
+        path: `/api/boards/${boardId}/columns`,
+        expectedStatus: 201,
+        payload: { name: "Deployed" },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const secondBody = secondResponse.body as {
+        data: { position: number };
+      };
+      expect(secondBody.data.position).toBe(5);
+
+      const boardResponse = await httpRequest({
+        method: "get",
+        path: `/api/projects/${projectId}/board`,
+        expectedStatus: 200,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const boardBody = boardResponse.body as {
+        data: { columns: Array<{ position: number }> };
+      };
+
+      expect(boardBody.data.columns).toHaveLength(6);
+      expect(boardBody.data.columns.map((column) => column.position)).toEqual([0, 1, 2, 3, 4, 5]);
+    });
+  });
 });
