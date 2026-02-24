@@ -70,6 +70,15 @@ function normalizeForCompare(value: unknown): unknown {
     return value.toString();
   }
 
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "value" in value &&
+    typeof (value as { value?: unknown }).value === "string"
+  ) {
+    return (value as { value: string }).value;
+  }
+
   if (Array.isArray(value)) {
     return value.map((item) => normalizeForCompare(item));
   }
@@ -293,6 +302,47 @@ function model(name: string, schema: Schema) {
     async findOne(filter: Record<string, unknown> = {}): Promise<Record<string, unknown> | null> {
       const found = getCollectionDocs(name).find((doc) => matches(doc, filter));
       return found ?? null;
+    },
+    find(filter: Record<string, unknown> = {}) {
+      const results = getCollectionDocs(name).filter((doc) => matches(doc, filter));
+      const query = {
+        _results: results,
+        sort(sortObj: Record<string, unknown>) {
+          const field = Object.keys(sortObj)[0];
+          const direction = sortObj[field] === -1 || sortObj[field] === "desc" ? -1 : 1;
+          this._results.sort((a, b) => {
+            const aVal = a[field];
+            const bVal = b[field];
+
+            if (aVal instanceof Date && bVal instanceof Date) {
+              return direction === -1
+                ? bVal.getTime() - aVal.getTime()
+                : aVal.getTime() - bVal.getTime();
+            }
+
+            if (aVal === bVal) {
+              return 0;
+            }
+
+            if (direction === -1) {
+              return aVal > bVal ? -1 : 1;
+            }
+
+            return aVal < bVal ? -1 : 1;
+          });
+          return this;
+        },
+        select() {
+          return this;
+        },
+        lean() {
+          return this;
+        },
+        then(onfulfilled?: (value: Record<string, unknown>[]) => unknown, onrejected?: (reason: unknown) => unknown) {
+          return Promise.resolve(this._results).then(onfulfilled, onrejected);
+        },
+      };
+      return query;
     },
     async deleteMany(filter: Record<string, unknown> = {}): Promise<{ deletedCount: number }> {
       const docs = getCollectionDocs(name);
