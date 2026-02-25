@@ -4,7 +4,7 @@ import {
   useContext,
   useState,
 } from "react";
-import type { ReactNode } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { Board, Column, Task } from "@taskboard/shared";
 import {
   fetchBoard,
@@ -14,6 +14,10 @@ import {
   deleteColumn as apiDeleteColumn,
   reorderColumns as apiReorderColumns,
 } from "../api/boards";
+import {
+  createTask as apiCreateTask,
+  moveTask as apiMoveTask,
+} from "../api/tasks";
 
 interface BoardContextValue {
   board: Board | null;
@@ -25,6 +29,9 @@ interface BoardContextValue {
   renameColumn: (columnId: string, name: string) => Promise<Column>;
   removeColumn: (columnId: string) => Promise<void>;
   reorderColumns: (columnIds: string[]) => Promise<void>;
+  createTask: (columnName: string, title: string) => Promise<Task>;
+  moveTask: (taskId: string, status: string, position: number) => Promise<void>;
+  setTasks: Dispatch<SetStateAction<Task[]>>;
 }
 
 const BoardContext = createContext<BoardContextValue | null>(null);
@@ -128,6 +135,86 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     [board],
   );
 
+  const createTask = useCallback(
+    async (columnName: string, title: string): Promise<Task> => {
+      if (!board) throw new Error("Board not loaded");
+      const response = await apiCreateTask(board._id, {
+        title,
+        status: columnName,
+      });
+      const newTask = response.data;
+      setTasks((prev) => [...prev, newTask]);
+      return newTask;
+    },
+    [board],
+  );
+
+  const moveTask = useCallback(
+    async (taskId: string, status: string, position: number): Promise<void> => {
+      if (!board) throw new Error("Board not loaded");
+
+      // Snapshot for rollback
+      const previousTasks = tasks;
+
+      // Optimistic update
+      setTasks((prev) => {
+        const taskIndex = prev.findIndex((t) => t._id === taskId);
+        if (taskIndex === -1) return prev;
+
+        const task = prev[taskIndex];
+        const remaining = prev.filter((t) => t._id !== taskId);
+
+        // Reindex source column (fill gap left by removed task)
+        const sourceColumnTasks = remaining
+          .filter((t) => t.status === task.status)
+          .sort((a, b) => a.position - b.position)
+          .map((t, i) => ({ ...t, position: i }));
+
+        // Get destination column tasks
+        const destColumnTasks =
+          status === task.status
+            ? sourceColumnTasks
+            : remaining
+                .filter((t) => t.status === status)
+                .sort((a, b) => a.position - b.position);
+
+        // Clamp position to valid range
+        const clampedPosition = Math.min(position, destColumnTasks.length);
+
+        // Shift destination tasks at >= clampedPosition
+        const shiftedDestTasks = destColumnTasks.map((t) =>
+          t.position >= clampedPosition
+            ? { ...t, position: t.position + 1 }
+            : t,
+        );
+
+        // Build moved task
+        const movedTask = { ...task, status, position: clampedPosition };
+
+        // Reconstruct full task list
+        const otherTasks = remaining.filter(
+          (t) => t.status !== task.status && t.status !== status,
+        );
+
+        if (status === task.status) {
+          return [...otherTasks, ...shiftedDestTasks, movedTask];
+        }
+        return [...otherTasks, ...sourceColumnTasks, ...shiftedDestTasks, movedTask];
+      });
+
+      try {
+        await apiMoveTask(taskId, { status, position });
+      } catch (err) {
+        // Revert to snapshot
+        setTasks(previousTasks);
+        setError(
+          err instanceof Error ? err.message : "Failed to move task",
+        );
+      }
+    },
+    [board, tasks],
+  );
+
   return (
     <BoardContext.Provider
       value={{
@@ -140,6 +227,9 @@ export function BoardProvider({ children }: { children: ReactNode }) {
         renameColumn,
         removeColumn,
         reorderColumns,
+        createTask,
+        moveTask,
+        setTasks,
       }}
     >
       {children}

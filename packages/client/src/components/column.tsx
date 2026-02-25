@@ -12,9 +12,10 @@ interface ColumnProps {
   onRename: (columnId: string, name: string) => Promise<void>;
   onDelete: (columnId: string) => Promise<void>;
   children: ReactNode;
+  footer?: ReactNode;
 }
 
-export function Column({ column, taskCount, onRename, onDelete, children }: ColumnProps) {
+export function Column({ column, taskCount, onRename, onDelete, children, footer }: ColumnProps) {
   // --- dnd-kit sortable ---
   const {
     attributes,
@@ -24,7 +25,7 @@ export function Column({ column, taskCount, onRename, onDelete, children }: Colu
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: column._id });
+  } = useSortable({ id: column._id, data: { type: "column" } });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -160,9 +161,16 @@ export function Column({ column, taskCount, onRename, onDelete, children }: Colu
       )}
 
       {/* Task list — scrollable */}
-      <div className="flex-1 overflow-y-auto px-3 pb-3">
+      <div className="min-h-[2rem] flex-1 overflow-y-auto px-3 pb-3">
         {children}
       </div>
+
+      {/* Footer (e.g., AddTaskForm) */}
+      {footer && (
+        <div className="px-3 pb-3">
+          {footer}
+        </div>
+      )}
 
       {/* Confirm dialog for delete */}
       <ConfirmDialog

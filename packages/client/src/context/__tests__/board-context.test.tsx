@@ -9,6 +9,10 @@ import {
   deleteColumn,
   reorderColumns,
 } from "../../api/boards";
+import {
+  createTask as apiCreateTask,
+  moveTask as apiMoveTask,
+} from "../../api/tasks";
 
 vi.mock("../../api/boards", () => ({
   fetchBoard: vi.fn(),
@@ -19,12 +23,19 @@ vi.mock("../../api/boards", () => ({
   reorderColumns: vi.fn(),
 }));
 
+vi.mock("../../api/tasks", () => ({
+  createTask: vi.fn(),
+  moveTask: vi.fn(),
+}));
+
 const mockFetchBoard = fetchBoard as ReturnType<typeof vi.fn>;
 const mockFetchBoardTasks = fetchBoardTasks as ReturnType<typeof vi.fn>;
 const mockAddColumn = addColumn as ReturnType<typeof vi.fn>;
 const mockRenameColumn = renameColumn as ReturnType<typeof vi.fn>;
 const mockDeleteColumn = deleteColumn as ReturnType<typeof vi.fn>;
 const mockReorderColumns = reorderColumns as ReturnType<typeof vi.fn>;
+const mockApiCreateTask = apiCreateTask as ReturnType<typeof vi.fn>;
+const mockApiMoveTask = apiMoveTask as ReturnType<typeof vi.fn>;
 
 const mockBoard = {
   _id: "board1",
@@ -53,6 +64,45 @@ const mockTasks = [
   },
 ];
 
+const multiTasks = [
+  {
+    _id: "task1",
+    title: "Task 1",
+    status: "To Do",
+    priority: "medium" as const,
+    position: 0,
+    labels: [],
+    board: "board1",
+    project: "proj1",
+    createdAt: "2025-01-01T00:00:00.000Z",
+    updatedAt: "2025-01-01T00:00:00.000Z",
+  },
+  {
+    _id: "task2",
+    title: "Task 2",
+    status: "To Do",
+    priority: "high" as const,
+    position: 1,
+    labels: [],
+    board: "board1",
+    project: "proj1",
+    createdAt: "2025-01-02T00:00:00.000Z",
+    updatedAt: "2025-01-02T00:00:00.000Z",
+  },
+  {
+    _id: "task3",
+    title: "Task 3",
+    status: "In Progress",
+    priority: "low" as const,
+    position: 0,
+    labels: [],
+    board: "board1",
+    project: "proj1",
+    createdAt: "2025-01-03T00:00:00.000Z",
+    updatedAt: "2025-01-03T00:00:00.000Z",
+  },
+];
+
 let testHookValues: ReturnType<typeof useBoard>;
 
 function TestConsumer() {
@@ -66,6 +116,12 @@ function TestConsumer() {
       <span data-testid="task-count">{values.tasks.length}</span>
       <span data-testid="columns">
         {values.board?.columns.map((c) => c.name).join(",") ?? ""}
+      </span>
+      <span data-testid="task-statuses">
+        {values.tasks
+          .sort((a, b) => a._id.localeCompare(b._id))
+          .map((t) => `${t._id}:${t.status}:${t.position}`)
+          .join(",")}
       </span>
     </div>
   );
@@ -303,5 +359,176 @@ describe("BoardContext", () => {
         await testHookValues.reorderColumns(["col3", "col1", "col2"]);
       }),
     ).rejects.toThrow("Board not loaded");
+  });
+
+  it("createTask calls API and appends task to state", async () => {
+    mockFetchBoard.mockResolvedValue({ data: mockBoard });
+    mockFetchBoardTasks.mockResolvedValue({ data: mockTasks });
+    const newTask = {
+      _id: "task2",
+      title: "New Task",
+      status: "In Progress",
+      priority: "medium" as const,
+      position: 0,
+      labels: [],
+      board: "board1",
+      project: "proj1",
+      createdAt: "2025-01-02T00:00:00.000Z",
+      updatedAt: "2025-01-02T00:00:00.000Z",
+    };
+    mockApiCreateTask.mockResolvedValue({ data: newTask });
+
+    renderWithProvider();
+
+    await act(async () => {
+      await testHookValues.loadBoard("proj1");
+    });
+
+    let result;
+    await act(async () => {
+      result = await testHookValues.createTask("In Progress", "New Task");
+    });
+
+    expect(mockApiCreateTask).toHaveBeenCalledWith("board1", {
+      title: "New Task",
+      status: "In Progress",
+    });
+    expect(result).toEqual(newTask);
+    expect(screen.getByTestId("task-count")).toHaveTextContent("2");
+  });
+
+  it("createTask throws when board not loaded", async () => {
+    renderWithProvider();
+
+    await expect(
+      act(async () => {
+        await testHookValues.createTask("To Do", "New Task");
+      }),
+    ).rejects.toThrow("Board not loaded");
+  });
+
+  it("createTask does not modify state on API failure", async () => {
+    mockFetchBoard.mockResolvedValue({ data: mockBoard });
+    mockFetchBoardTasks.mockResolvedValue({ data: mockTasks });
+    mockApiCreateTask.mockRejectedValue(new Error("Create failed"));
+
+    renderWithProvider();
+
+    await act(async () => {
+      await testHookValues.loadBoard("proj1");
+    });
+
+    await expect(
+      act(async () => {
+        await testHookValues.createTask("To Do", "New Task");
+      }),
+    ).rejects.toThrow("Create failed");
+
+    expect(screen.getByTestId("task-count")).toHaveTextContent("1");
+  });
+
+  it("moveTask optimistically updates task status and position (cross-column)", async () => {
+    mockFetchBoard.mockResolvedValue({ data: mockBoard });
+    mockFetchBoardTasks.mockResolvedValue({ data: multiTasks });
+    const movedTask = { ...multiTasks[0], status: "In Progress", position: 1 };
+    mockApiMoveTask.mockResolvedValue({ data: movedTask });
+
+    renderWithProvider();
+
+    await act(async () => {
+      await testHookValues.loadBoard("proj1");
+    });
+
+    await act(async () => {
+      await testHookValues.moveTask("task1", "In Progress", 1);
+    });
+
+    expect(mockApiMoveTask).toHaveBeenCalledWith("task1", {
+      status: "In Progress",
+      position: 1,
+    });
+
+    const statuses = screen.getByTestId("task-statuses").textContent;
+    expect(statuses).toContain("task1:In Progress:1");
+    expect(statuses).toContain("task2:To Do:0");
+    expect(statuses).toContain("task3:In Progress:0");
+  });
+
+  it("moveTask reverts on API failure and sets error", async () => {
+    mockFetchBoard.mockResolvedValue({ data: mockBoard });
+    mockFetchBoardTasks.mockResolvedValue({ data: multiTasks });
+    mockApiMoveTask.mockRejectedValue(new Error("Move failed"));
+
+    renderWithProvider();
+
+    await act(async () => {
+      await testHookValues.loadBoard("proj1");
+    });
+
+    await act(async () => {
+      await testHookValues.moveTask("task1", "In Progress", 0);
+    });
+
+    await waitFor(() => {
+      const statuses = screen.getByTestId("task-statuses").textContent;
+      expect(statuses).toContain("task1:To Do:0");
+      expect(statuses).toContain("task2:To Do:1");
+      expect(statuses).toContain("task3:In Progress:0");
+    });
+    expect(screen.getByTestId("error")).toHaveTextContent("Move failed");
+  });
+
+  it("moveTask throws when board not loaded", async () => {
+    renderWithProvider();
+
+    await expect(
+      act(async () => {
+        await testHookValues.moveTask("task1", "In Progress", 0);
+      }),
+    ).rejects.toThrow("Board not loaded");
+  });
+
+  it("moveTask handles same-column reorder", async () => {
+    mockFetchBoard.mockResolvedValue({ data: mockBoard });
+    mockFetchBoardTasks.mockResolvedValue({ data: multiTasks });
+    const movedTask = { ...multiTasks[0], status: "To Do", position: 1 };
+    mockApiMoveTask.mockResolvedValue({ data: movedTask });
+
+    renderWithProvider();
+
+    await act(async () => {
+      await testHookValues.loadBoard("proj1");
+    });
+
+    await act(async () => {
+      await testHookValues.moveTask("task1", "To Do", 1);
+    });
+
+    expect(mockApiMoveTask).toHaveBeenCalledWith("task1", {
+      status: "To Do",
+      position: 1,
+    });
+
+    const statuses = screen.getByTestId("task-statuses").textContent;
+    expect(statuses).toContain("task1:To Do:1");
+  });
+
+  it("setTasks is exposed and can update tasks directly", async () => {
+    mockFetchBoard.mockResolvedValue({ data: mockBoard });
+    mockFetchBoardTasks.mockResolvedValue({ data: mockTasks });
+
+    renderWithProvider();
+
+    await act(async () => {
+      await testHookValues.loadBoard("proj1");
+    });
+
+    expect(screen.getByTestId("task-count")).toHaveTextContent("1");
+
+    act(() => {
+      testHookValues.setTasks([]);
+    });
+
+    expect(screen.getByTestId("task-count")).toHaveTextContent("0");
   });
 });
