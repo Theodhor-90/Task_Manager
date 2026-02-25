@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { BoardView } from "../board-view";
 
@@ -8,13 +8,30 @@ vi.mock("../../context/board-context", () => ({
   useBoard: (...args: unknown[]) => mockUseBoard(...args),
 }));
 
+let capturedOnDragStart: ((event: unknown) => void) | undefined;
+let capturedOnDragOver: ((event: unknown) => void) | undefined;
 let capturedOnDragEnd: ((event: unknown) => void) | undefined;
 
 vi.mock("@dnd-kit/core", () => ({
-  DndContext: ({ children, onDragEnd }: { children: React.ReactNode; onDragEnd?: (event: unknown) => void }) => {
+  DndContext: ({
+    children,
+    onDragStart,
+    onDragOver,
+    onDragEnd,
+  }: {
+    children: React.ReactNode;
+    onDragStart?: (event: unknown) => void;
+    onDragOver?: (event: unknown) => void;
+    onDragEnd?: (event: unknown) => void;
+  }) => {
+    capturedOnDragStart = onDragStart;
+    capturedOnDragOver = onDragOver;
     capturedOnDragEnd = onDragEnd;
     return <div data-testid="dnd-context">{children}</div>;
   },
+  DragOverlay: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="drag-overlay">{children}</div>
+  ),
   closestCenter: vi.fn(),
   PointerSensor: vi.fn(),
   KeyboardSensor: vi.fn(),
@@ -27,12 +44,30 @@ vi.mock("@dnd-kit/sortable", () => ({
     <div data-testid="sortable-context">{children}</div>
   ),
   horizontalListSortingStrategy: "horizontal",
+  verticalListSortingStrategy: "vertical",
   arrayMove: vi.fn((array: unknown[], from: number, to: number) => {
     const result = [...(array as unknown[])];
     const [removed] = result.splice(from, 1);
     result.splice(to, 0, removed);
     return result;
   }),
+  useSortable: vi.fn(() => ({
+    attributes: {},
+    listeners: {},
+    setNodeRef: vi.fn(),
+    setActivatorNodeRef: vi.fn(),
+    transform: null,
+    transition: undefined,
+    isDragging: false,
+  })),
+}));
+
+vi.mock("@dnd-kit/utilities", () => ({
+  CSS: {
+    Transform: {
+      toString: () => undefined,
+    },
+  },
 }));
 
 vi.mock("../column", () => ({
@@ -40,16 +75,31 @@ vi.mock("../column", () => ({
     column,
     taskCount,
     children,
+    footer,
   }: {
     column: { _id: string; name: string };
     taskCount: number;
     children: React.ReactNode;
+    footer?: React.ReactNode;
   }) => (
     <div data-testid={`column-${column._id}`}>
       <span data-testid={`column-name-${column._id}`}>{column.name}</span>
       <span data-testid={`column-count-${column._id}`}>{taskCount}</span>
       <div data-testid={`column-tasks-${column._id}`}>{children}</div>
+      {footer && <div data-testid={`column-footer-${column._id}`}>{footer}</div>}
     </div>
+  ),
+}));
+
+vi.mock("../task-card", () => ({
+  TaskCard: ({ task }: { task: { _id: string; title: string } }) => (
+    <div data-testid={`task-card-${task._id}`}>{task.title}</div>
+  ),
+}));
+
+vi.mock("../add-task-form", () => ({
+  AddTaskForm: ({ columnName }: { columnName: string }) => (
+    <div data-testid={`add-task-form-${columnName}`}>+ Add task</div>
   ),
 }));
 
@@ -115,6 +165,9 @@ function defaultBoardState() {
     renameColumn: vi.fn().mockResolvedValue({ _id: "col1", name: "Backlog", position: 0 }),
     removeColumn: vi.fn().mockResolvedValue(undefined),
     reorderColumns: vi.fn().mockResolvedValue(undefined),
+    createTask: vi.fn().mockResolvedValue(undefined),
+    moveTask: vi.fn().mockResolvedValue(undefined),
+    setTasks: vi.fn(),
   };
 }
 
@@ -159,25 +212,28 @@ describe("BoardView", () => {
     expect(screen.getByTestId("column-count-col3")).toHaveTextContent("0");
   });
 
-  it("groups tasks by status and sorts by position", () => {
+  it("groups tasks by status and sorts by position within columns", () => {
     renderBoardView();
     const todoTasks = screen.getByTestId("column-tasks-col1");
-    const taskTexts = todoTasks.textContent;
+    const taskCards = todoTasks.querySelectorAll("[data-testid^='task-card-']");
     // "Setup project" (position 0) should come before "Write tests" (position 1)
-    expect(taskTexts).toBe("Setup projectWrite tests");
+    expect(taskCards[0]).toHaveAttribute("data-testid", "task-card-task2");
+    expect(taskCards[1]).toHaveAttribute("data-testid", "task-card-task1");
   });
 
-  it("renders task stubs with title text", () => {
+  it("renders TaskCard components with task titles", () => {
     renderBoardView();
-    expect(screen.getByText("Setup project")).toBeInTheDocument();
-    expect(screen.getByText("Write tests")).toBeInTheDocument();
-    expect(screen.getByText("Deploy app")).toBeInTheDocument();
+    expect(screen.getByTestId("task-card-task1")).toHaveTextContent("Write tests");
+    expect(screen.getByTestId("task-card-task2")).toHaveTextContent("Setup project");
+    expect(screen.getByTestId("task-card-task3")).toHaveTextContent("Deploy app");
   });
 
   it("renders DndContext and SortableContext", () => {
     renderBoardView();
     expect(screen.getByTestId("dnd-context")).toBeInTheDocument();
-    expect(screen.getByTestId("sortable-context")).toBeInTheDocument();
+    // Multiple sortable contexts: 1 for columns + 1 per column for tasks
+    const sortableContexts = screen.getAllByTestId("sortable-context");
+    expect(sortableContexts.length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows Add Column button when not adding", () => {
@@ -266,21 +322,20 @@ describe("BoardView", () => {
     });
   });
 
-  it("handleDragEnd calls reorderColumns with new column order", () => {
+  it("handleDragEnd calls reorderColumns for column drag with new column order", () => {
     const state = renderBoardView();
-    // Simulate dragging col1 (index 0) over col3 (index 2)
     capturedOnDragEnd!({
-      active: { id: "col1" },
-      over: { id: "col3" },
+      active: { id: "col1", data: { current: { type: "column" } } },
+      over: { id: "col3", data: { current: { type: "column" } } },
     });
     expect(state.reorderColumns).toHaveBeenCalledWith(["col2", "col3", "col1"]);
   });
 
-  it("handleDragEnd does not call reorderColumns when dropped on same position", () => {
+  it("handleDragEnd does not call reorderColumns when column dropped on same position", () => {
     const state = renderBoardView();
     capturedOnDragEnd!({
-      active: { id: "col1" },
-      over: { id: "col1" },
+      active: { id: "col1", data: { current: { type: "column" } } },
+      over: { id: "col1", data: { current: { type: "column" } } },
     });
     expect(state.reorderColumns).not.toHaveBeenCalled();
   });
@@ -288,9 +343,115 @@ describe("BoardView", () => {
   it("handleDragEnd does not call reorderColumns when over is null", () => {
     const state = renderBoardView();
     capturedOnDragEnd!({
-      active: { id: "col1" },
+      active: { id: "col1", data: { current: { type: "column" } } },
       over: null,
     });
     expect(state.reorderColumns).not.toHaveBeenCalled();
+  });
+
+  it("renders DragOverlay", () => {
+    renderBoardView();
+    expect(screen.getByTestId("drag-overlay")).toBeInTheDocument();
+  });
+
+  it("renders AddTaskForm in each column footer", () => {
+    renderBoardView();
+    expect(screen.getByTestId("add-task-form-To Do")).toBeInTheDocument();
+    expect(screen.getByTestId("add-task-form-In Progress")).toBeInTheDocument();
+    expect(screen.getByTestId("add-task-form-Done")).toBeInTheDocument();
+  });
+
+  it("handleDragEnd calls moveTask for task drag to different column", () => {
+    // Create a state with working setTasks that actually updates the board context
+    const updatedTasks = [...mockTasks];
+    const mockSetTasks = vi.fn((updater) => {
+      const newTasks = typeof updater === "function" ? updater(updatedTasks) : updater;
+      // Update the array in place so the component sees the change
+      updatedTasks.splice(0, updatedTasks.length, ...newTasks);
+      // Also update what useBoard returns
+      mockUseBoard.mockReturnValue({
+        ...state,
+        tasks: updatedTasks,
+      });
+    });
+
+    const state = renderBoardView({
+      tasks: updatedTasks,
+      setTasks: mockSetTasks,
+    });
+
+    act(() => {
+      // Simulate drag start to set snapshot
+      capturedOnDragStart!({
+        active: {
+          id: "task3",
+          data: { current: { type: "task", task: mockTasks[2] } },
+        },
+      });
+
+      // Simulate drag over to move task to different column
+      capturedOnDragOver!({
+        active: {
+          id: "task3",
+          data: { current: { type: "task", task: mockTasks[2] } },
+        },
+        over: {
+          id: "task2",
+          data: { current: { type: "task", task: mockTasks[1] } },
+        },
+      });
+
+      // Simulate drag end — task dropped on a task in a different column
+      capturedOnDragEnd!({
+        active: {
+          id: "task3",
+          data: { current: { type: "task", task: mockTasks[2] } },
+        },
+        over: {
+          id: "task2",
+          data: { current: { type: "task", task: mockTasks[1] } },
+        },
+      });
+    });
+
+    expect(state.moveTask).toHaveBeenCalled();
+  });
+
+  it("handleDragEnd does not call moveTask when task has not moved", () => {
+    const state = renderBoardView();
+
+    act(() => {
+      // Simulate drag start
+      capturedOnDragStart!({
+        active: {
+          id: "task2",
+          data: { current: { type: "task", task: mockTasks[1] } },
+        },
+      });
+
+      // Simulate drag end — dropped on itself
+      capturedOnDragEnd!({
+        active: {
+          id: "task2",
+          data: { current: { type: "task", task: mockTasks[1] } },
+        },
+        over: {
+          id: "task2",
+          data: { current: { type: "task", task: mockTasks[1] } },
+        },
+      });
+    });
+
+    expect(state.moveTask).not.toHaveBeenCalled();
+  });
+
+  it("handleDragEnd dispatches to column reorder not moveTask for column type", () => {
+    const state = renderBoardView();
+    capturedOnDragEnd!({
+      active: { id: "col1", data: { current: { type: "column" } } },
+      over: { id: "col2", data: { current: { type: "column" } } },
+    });
+    expect(state.reorderColumns).toHaveBeenCalled();
+    expect(state.moveTask).not.toHaveBeenCalled();
   });
 });
