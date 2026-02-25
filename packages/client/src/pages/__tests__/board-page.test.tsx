@@ -5,9 +5,22 @@ import { BoardPage } from "../board-page";
 import type { Project } from "@taskboard/shared";
 
 const mockUseProjects = vi.fn();
+const mockLoadBoard = vi.fn();
+const mockUseBoard = vi.fn();
 
 vi.mock("../../context/projects-context", () => ({
   useProjects: (...args: unknown[]) => mockUseProjects(...args),
+}));
+
+vi.mock("../../context/board-context", () => ({
+  BoardProvider: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="board-provider">{children}</div>
+  ),
+  useBoard: (...args: unknown[]) => mockUseBoard(...args),
+}));
+
+vi.mock("../../components/board-view", () => ({
+  BoardView: () => <div data-testid="board-view">BoardView</div>,
 }));
 
 const mockProjects: Project[] = [
@@ -52,16 +65,13 @@ function renderBoardPage(projectId: string = "proj1") {
 describe("BoardPage", () => {
   beforeEach(() => {
     mockUseProjects.mockReturnValue(defaultProjectsState());
+    mockLoadBoard.mockReset();
+    mockUseBoard.mockReturnValue({ loadBoard: mockLoadBoard });
   });
 
   it("renders the project name as a heading", () => {
     renderBoardPage("proj1");
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Project Alpha");
-  });
-
-  it("renders the placeholder message", () => {
-    renderBoardPage("proj1");
-    expect(screen.getByText("Board coming in Milestone 4")).toBeInTheDocument();
   });
 
   it("shows loading spinner when projects are loading", () => {
@@ -106,5 +116,35 @@ describe("BoardPage", () => {
   it("does not render PRIORITIES debug content", () => {
     renderBoardPage("proj1");
     expect(screen.queryByText(/priority levels/i)).not.toBeInTheDocument();
+  });
+
+  it("wraps content in BoardProvider", () => {
+    renderBoardPage("proj1");
+    expect(screen.getByTestId("board-provider")).toBeInTheDocument();
+  });
+
+  it("renders BoardView", () => {
+    renderBoardPage("proj1");
+    expect(screen.getByTestId("board-view")).toBeInTheDocument();
+  });
+
+  it("calls loadBoard with the project ID on mount", () => {
+    renderBoardPage("proj1");
+    expect(mockLoadBoard).toHaveBeenCalledWith("proj1");
+  });
+
+  it("does not render BoardProvider when project not found", () => {
+    renderBoardPage("nonexistent");
+    expect(screen.queryByTestId("board-provider")).not.toBeInTheDocument();
+  });
+
+  it("does not render BoardProvider when loading", () => {
+    mockUseProjects.mockReturnValue({
+      ...defaultProjectsState(),
+      projects: [],
+      isLoading: true,
+    });
+    renderBoardPage("proj1");
+    expect(screen.queryByTestId("board-provider")).not.toBeInTheDocument();
   });
 });

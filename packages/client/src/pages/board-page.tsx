@@ -1,6 +1,19 @@
+import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useProjects } from "../context/projects-context";
+import { BoardProvider, useBoard } from "../context/board-context";
+import { BoardView } from "../components/board-view";
 import { LoadingSpinner } from "../components/ui/loading-spinner";
+
+function BoardContent({ projectId }: { projectId: string }) {
+  const { loadBoard } = useBoard();
+
+  useEffect(() => {
+    loadBoard(projectId);
+  }, [projectId, loadBoard]);
+
+  return <BoardView />;
+}
 
 export function BoardPage() {
   const { id } = useParams<{ id: string }>();
@@ -25,11 +38,11 @@ export function BoardPage() {
   }
 
   return (
-    <div>
-      <h2 className="text-2xl font-semibold text-gray-900">{project.name}</h2>
-      <div className="mt-6 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-        <p className="text-sm text-gray-500">Board coming in Milestone 4</p>
+    <BoardProvider>
+      <div>
+        <h2 className="text-2xl font-semibold text-gray-900">{project.name}</h2>
+        <BoardContent projectId={project._id} />
       </div>
-    </div>
+    </BoardProvider>
   );
 }
