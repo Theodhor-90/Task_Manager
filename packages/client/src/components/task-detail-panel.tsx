@@ -1,16 +1,24 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import type { Task } from "@taskboard/shared";
+import type { Task, Priority } from "@taskboard/shared";
 import { fetchTask } from "../api/tasks";
 import { useBoard } from "../context/board-context";
 import { LoadingSpinner } from "./ui/loading-spinner";
 import { ErrorMessage } from "./ui/error-message";
 import Markdown from "react-markdown";
+import { PRIORITY_CLASSES } from "./task-card";
 
 interface TaskDetailPanelProps {
   taskId: string;
   onClose: () => void;
 }
+
+const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+  { value: "urgent", label: "Urgent" },
+];
 
 export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
   const [task, setTask] = useState<Task | null>(null);
@@ -134,6 +142,43 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
     }
   }
 
+  async function handlePriorityChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    if (!task) return;
+    const newPriority = e.target.value as Priority;
+    if (newPriority === task.priority) return;
+    try {
+      const updated = await updateTask(taskId, { priority: newPriority });
+      setTask(updated);
+    } catch {
+      // No revert needed — the <select> will re-render with task.priority on next render
+    }
+  }
+
+  async function handleDueDateChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!task) return;
+    const newDate = e.target.value; // ISO date string "YYYY-MM-DD" or "" if cleared
+    const currentDate = task.dueDate ? task.dueDate.split("T")[0] : "";
+    if (newDate === currentDate) return;
+    try {
+      const updated = await updateTask(taskId, {
+        dueDate: newDate || null,
+      });
+      setTask(updated);
+    } catch {
+      // No revert needed — input re-renders with task.dueDate
+    }
+  }
+
+  async function handleClearDueDate() {
+    if (!task || !task.dueDate) return;
+    try {
+      const updated = await updateTask(taskId, { dueDate: null });
+      setTask(updated);
+    } catch {
+      // No revert needed — input re-renders with task.dueDate
+    }
+  }
+
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex"
@@ -240,6 +285,61 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* Metadata section — Priority and Due Date */}
+              <div className="mt-6 grid grid-cols-2 gap-4">
+                {/* Priority */}
+                <div>
+                  <label
+                    htmlFor="task-priority"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Priority
+                  </label>
+                  <select
+                    id="task-priority"
+                    value={task.priority}
+                    onChange={handlePriorityChange}
+                    className={`mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${PRIORITY_CLASSES[task.priority]}`}
+                  >
+                    {PRIORITY_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Due Date */}
+                <div>
+                  <label
+                    htmlFor="task-due-date"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Due Date
+                  </label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      id="task-due-date"
+                      type="date"
+                      value={task.dueDate ? task.dueDate.split("T")[0] : ""}
+                      onChange={handleDueDateChange}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      aria-label="Task due date"
+                    />
+                    {task.dueDate && (
+                      <button
+                        onClick={handleClearDueDate}
+                        className="text-gray-400 hover:text-gray-600"
+                        aria-label="Clear due date"
+                        title="Clear due date"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </>
           )}

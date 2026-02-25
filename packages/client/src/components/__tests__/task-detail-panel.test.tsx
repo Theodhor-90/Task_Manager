@@ -44,6 +44,11 @@ const mockTaskNoDescription: Task = {
   description: "",
 };
 
+const mockTaskWithDueDate: Task = {
+  ...mockTask,
+  dueDate: "2026-03-15T00:00:00.000Z",
+};
+
 interface TaskDetailPanelProps {
   taskId: string;
   onClose: () => void;
@@ -588,5 +593,195 @@ describe("TaskDetailPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));
 
     expect(screen.getByTestId("markdown-preview")).toHaveTextContent("New content");
+  });
+
+  it("priority selector shows current priority", async () => {
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    const select = screen.getByLabelText("Priority") as HTMLSelectElement;
+    expect(select.value).toBe("medium");
+  });
+
+  it("priority selector lists all four options", async () => {
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    const options = screen.getByLabelText("Priority").querySelectorAll("option");
+    expect(options).toHaveLength(4);
+    expect(options[0]).toHaveTextContent("Low");
+    expect(options[1]).toHaveTextContent("Medium");
+    expect(options[2]).toHaveTextContent("High");
+    expect(options[3]).toHaveTextContent("Urgent");
+  });
+
+  it("changing priority calls updateTask", async () => {
+    const mockUpdateTask = vi.fn().mockResolvedValue({
+      ...mockTask,
+      priority: "high",
+    });
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    const select = screen.getByLabelText("Priority");
+    fireEvent.change(select, { target: { value: "high" } });
+
+    await waitFor(() => {
+      expect(mockUpdateTask).toHaveBeenCalledWith("task1", { priority: "high" });
+    });
+
+    await waitFor(() => {
+      expect((screen.getByLabelText("Priority") as HTMLSelectElement).value).toBe("high");
+    });
+  });
+
+  it("priority update failure keeps original value", async () => {
+    const mockUpdateTask = vi.fn().mockRejectedValue(new Error("Failed"));
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    const select = screen.getByLabelText("Priority");
+    fireEvent.change(select, { target: { value: "urgent" } });
+
+    await waitFor(() => {
+      expect(mockUpdateTask).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect((screen.getByLabelText("Priority") as HTMLSelectElement).value).toBe("medium");
+    });
+  });
+
+  it("due date input shows empty when no due date", async () => {
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    const input = screen.getByLabelText("Task due date") as HTMLInputElement;
+    expect(input.value).toBe("");
+  });
+
+  it("due date input shows current date", async () => {
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTaskWithDueDate } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    const input = screen.getByLabelText("Task due date") as HTMLInputElement;
+    expect(input.value).toBe("2026-03-15");
+  });
+
+  it("changing due date calls updateTask", async () => {
+    const mockUpdateTask = vi.fn().mockResolvedValue({
+      ...mockTask,
+      dueDate: "2026-04-01T00:00:00.000Z",
+    });
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    const input = screen.getByLabelText("Task due date");
+    fireEvent.change(input, { target: { value: "2026-04-01" } });
+
+    await waitFor(() => {
+      expect(mockUpdateTask).toHaveBeenCalledWith("task1", { dueDate: "2026-04-01" });
+    });
+  });
+
+  it("clear button sends null for due date", async () => {
+    const mockUpdateTask = vi.fn().mockResolvedValue({
+      ...mockTaskWithDueDate,
+      dueDate: undefined,
+    });
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTaskWithDueDate } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    const clearButton = screen.getByLabelText("Clear due date");
+    fireEvent.click(clearButton);
+
+    await waitFor(() => {
+      expect(mockUpdateTask).toHaveBeenCalledWith("task1", { dueDate: null });
+    });
+  });
+
+  it("clear button not shown when no due date", async () => {
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByLabelText("Clear due date")).not.toBeInTheDocument();
+  });
+
+  it("due date clear updates the input", async () => {
+    const clearedTask = { ...mockTaskWithDueDate, dueDate: undefined };
+    const mockUpdateTask = vi.fn().mockResolvedValue(clearedTask);
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTaskWithDueDate } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    expect((screen.getByLabelText("Task due date") as HTMLInputElement).value).toBe("2026-03-15");
+
+    const clearButton = screen.getByLabelText("Clear due date");
+    fireEvent.click(clearButton);
+
+    await waitFor(() => {
+      expect((screen.getByLabelText("Task due date") as HTMLInputElement).value).toBe("");
+    });
+
+    expect(screen.queryByLabelText("Clear due date")).not.toBeInTheDocument();
   });
 });
