@@ -161,7 +161,7 @@ export function Column({ column, taskCount, onRename, onDelete, children, footer
       )}
 
       {/* Task list — scrollable */}
-      <div className="flex-1 overflow-y-auto px-3 pb-3">
+      <div className="min-h-[2rem] flex-1 overflow-y-auto px-3 pb-3">
         {children}
       </div>
 

@@ -39,7 +39,7 @@ function SortableTaskItem({ task }: { task: Task }) {
   });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : undefined,
   };
@@ -354,7 +354,11 @@ export function BoardView() {
       </SortableContext>
 
       <DragOverlay>
-        {activeTask ? <TaskCard task={activeTask} /> : null}
+        {activeTask ? (
+          <div className="rotate-1 shadow-lg">
+            <TaskCard task={activeTask} />
+          </div>
+        ) : null}
       </DragOverlay>
     </DndContext>
   );
