@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AppLayout } from "../app-layout";
@@ -108,5 +108,27 @@ describe("AppLayout", () => {
     });
     renderAppLayout();
     expect(screen.getByRole("status")).toBeInTheDocument();
+  });
+
+  it('opens create project modal when sidebar "New Project" button is clicked', () => {
+    renderAppLayout();
+    const newProjectButton = screen.getByRole("button", { name: "New Project" });
+    fireEvent.click(newProjectButton);
+    expect(screen.getByRole("heading", { name: "New Project" })).toBeInTheDocument();
+  });
+
+  it("closes create project modal when Cancel is clicked", () => {
+    renderAppLayout();
+    fireEvent.click(screen.getByRole("button", { name: "New Project" }));
+    expect(screen.getByRole("heading", { name: "New Project" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("heading", { name: "New Project" })).not.toBeInTheDocument();
+  });
+
+  it("sidebar create button works on board route", () => {
+    renderAppLayout(["/projects/abc/board"]);
+    const newProjectButton = screen.getByRole("button", { name: "New Project" });
+    fireEvent.click(newProjectButton);
+    expect(screen.getByRole("heading", { name: "New Project" })).toBeInTheDocument();
   });
 });
