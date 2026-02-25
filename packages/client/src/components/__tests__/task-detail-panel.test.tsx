@@ -77,6 +77,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockReturnValue(new Promise(() => {}));
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
+      labels: [],
     } as any);
 
     renderPanel();
@@ -89,6 +90,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockRejectedValue(new Error("Not found"));
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
+      labels: [],
     } as any);
 
     renderPanel();
@@ -103,6 +105,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
+      labels: [],
     } as any);
 
     renderPanel();
@@ -117,6 +120,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
+      labels: [],
     } as any);
 
     const { onClose } = renderPanel();
@@ -135,6 +139,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
+      labels: [],
     } as any);
 
     const { onClose } = renderPanel();
@@ -153,6 +158,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
+      labels: [],
     } as any);
 
     const { onClose } = renderPanel();
@@ -170,6 +176,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
+      labels: [],
     } as any);
 
     renderPanel();
@@ -195,6 +202,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
     vi.mocked(useBoard).mockReturnValue({
       updateTask: mockUpdateTask,
+      labels: [],
     } as any);
 
     renderPanel();
@@ -228,6 +236,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
     vi.mocked(useBoard).mockReturnValue({
       updateTask: mockUpdateTask,
+      labels: [],
     } as any);
 
     renderPanel();
@@ -252,6 +261,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
+      labels: [],
     } as any);
 
     const { onClose } = renderPanel();
@@ -279,6 +289,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
     vi.mocked(useBoard).mockReturnValue({
       updateTask: mockUpdateTask,
+      labels: [],
     } as any);
 
     renderPanel();
@@ -305,6 +316,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
     vi.mocked(useBoard).mockReturnValue({
       updateTask: mockUpdateTask,
+      labels: [],
     } as any);
 
     renderPanel();
@@ -329,6 +341,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
+      labels: [],
     } as any);
 
     renderPanel();
@@ -342,6 +355,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
+      labels: [],
     } as any);
 
     const { unmount } = renderPanel();
@@ -360,6 +374,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
     vi.mocked(useBoard).mockReturnValue({
       updateTask: mockUpdateTask,
+      labels: [],
     } as any);
 
     renderPanel();
@@ -388,6 +403,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
+      labels: [],
     } as any);
 
     const { onClose } = renderPanel();
@@ -404,7 +420,7 @@ describe("TaskDetailPanel", () => {
 
   it("defaults to Preview tab when description exists", async () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn(), labels: [] } as any);
 
     renderPanel();
 
@@ -419,7 +435,7 @@ describe("TaskDetailPanel", () => {
 
   it("defaults to Write tab when description is empty", async () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTaskNoDescription } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn(), labels: [] } as any);
 
     renderPanel();
 
@@ -433,7 +449,7 @@ describe("TaskDetailPanel", () => {
 
   it("renders textarea in Write tab with current description", async () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn(), labels: [] } as any);
 
     renderPanel();
 
@@ -451,7 +467,7 @@ describe("TaskDetailPanel", () => {
 
   it("renders markdown content in Preview tab", async () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn(), labels: [] } as any);
 
     renderPanel();
 
@@ -462,7 +478,7 @@ describe("TaskDetailPanel", () => {
 
   it("switches between Write and Preview tabs", async () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn(), labels: [] } as any);
 
     renderPanel();
 
@@ -487,7 +503,7 @@ describe("TaskDetailPanel", () => {
       description: "Updated description",
     });
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask, labels: [] } as any);
 
     renderPanel();
 
@@ -510,7 +526,7 @@ describe("TaskDetailPanel", () => {
   it("description does not save on blur when unchanged", async () => {
     const mockUpdateTask = vi.fn();
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask, labels: [] } as any);
 
     renderPanel();
 
@@ -529,7 +545,7 @@ describe("TaskDetailPanel", () => {
 
   it("shows placeholder when description is empty in Preview mode", async () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTaskNoDescription } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn(), labels: [] } as any);
 
     renderPanel();
 
@@ -547,7 +563,7 @@ describe("TaskDetailPanel", () => {
   it("description save failure reverts to current description", async () => {
     const mockUpdateTask = vi.fn().mockRejectedValue(new Error("Save failed"));
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask, labels: [] } as any);
 
     renderPanel();
 
@@ -578,7 +594,7 @@ describe("TaskDetailPanel", () => {
       description: "New content",
     });
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask, labels: [] } as any);
 
     renderPanel();
 
@@ -604,7 +620,7 @@ describe("TaskDetailPanel", () => {
 
   it("priority selector shows current priority", async () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn(), labels: [] } as any);
 
     renderPanel();
 
@@ -618,7 +634,7 @@ describe("TaskDetailPanel", () => {
 
   it("priority selector lists all four options", async () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn(), labels: [] } as any);
 
     renderPanel();
 
@@ -640,7 +656,7 @@ describe("TaskDetailPanel", () => {
       priority: "high",
     });
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask, labels: [] } as any);
 
     renderPanel();
 
@@ -663,7 +679,7 @@ describe("TaskDetailPanel", () => {
   it("priority update failure keeps original value", async () => {
     const mockUpdateTask = vi.fn().mockRejectedValue(new Error("Failed"));
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask, labels: [] } as any);
 
     renderPanel();
 
@@ -685,7 +701,7 @@ describe("TaskDetailPanel", () => {
 
   it("due date input shows empty when no due date", async () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn(), labels: [] } as any);
 
     renderPanel();
 
@@ -699,7 +715,7 @@ describe("TaskDetailPanel", () => {
 
   it("due date input shows current date", async () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTaskWithDueDate } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn(), labels: [] } as any);
 
     renderPanel();
 
@@ -717,7 +733,7 @@ describe("TaskDetailPanel", () => {
       dueDate: "2026-04-01T00:00:00.000Z",
     });
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask, labels: [] } as any);
 
     renderPanel();
 
@@ -739,7 +755,7 @@ describe("TaskDetailPanel", () => {
       dueDate: undefined,
     });
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTaskWithDueDate } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask, labels: [] } as any);
 
     renderPanel();
 
@@ -757,7 +773,7 @@ describe("TaskDetailPanel", () => {
 
   it("clear button not shown when no due date", async () => {
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn(), labels: [] } as any);
 
     renderPanel();
 
@@ -772,7 +788,7 @@ describe("TaskDetailPanel", () => {
     const clearedTask = { ...mockTaskWithDueDate, dueDate: undefined };
     const mockUpdateTask = vi.fn().mockResolvedValue(clearedTask);
     vi.mocked(fetchTask).mockResolvedValue({ data: mockTaskWithDueDate } as any);
-    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask, labels: [] } as any);
 
     renderPanel();
 
@@ -797,6 +813,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
       removeTask: vi.fn(),
+      labels: [],
     } as any);
 
     renderPanel();
@@ -813,6 +830,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
       removeTask: vi.fn(),
+      labels: [],
     } as any);
 
     renderPanel();
@@ -836,6 +854,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
       removeTask: mockRemoveTask,
+      labels: [],
     } as any);
 
     renderPanel();
@@ -857,6 +876,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
       removeTask: mockRemoveTask,
+      labels: [],
     } as any);
 
     const { onClose } = renderPanel();
@@ -883,6 +903,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
       removeTask: mockRemoveTask,
+      labels: [],
     } as any);
 
     const { onClose } = renderPanel();
@@ -911,6 +932,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
       removeTask: mockRemoveTask,
+      labels: [],
     } as any);
 
     renderPanel();
@@ -936,6 +958,7 @@ describe("TaskDetailPanel", () => {
     vi.mocked(useBoard).mockReturnValue({
       updateTask: vi.fn(),
       removeTask: vi.fn(),
+      labels: [],
     } as any);
 
     const { onClose } = renderPanel();

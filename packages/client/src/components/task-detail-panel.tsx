@@ -7,6 +7,7 @@ import { LoadingSpinner } from "./ui/loading-spinner";
 import { ErrorMessage } from "./ui/error-message";
 import { ConfirmDialog } from "./ui/confirm-dialog";
 import { CommentList } from "./comment-list";
+import { LabelPicker } from "./label-picker";
 import Markdown from "react-markdown";
 import { PRIORITY_CLASSES } from "./task-card";
 
@@ -360,6 +361,15 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Labels */}
+              <div className="mt-4">
+                <LabelPicker
+                  taskId={taskId}
+                  labels={task.labels}
+                  onUpdate={(updatedTask) => setTask(updatedTask)}
+                />
               </div>
 
               {/* Comments section */}
