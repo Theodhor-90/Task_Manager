@@ -17,7 +17,10 @@ import {
 import {
   createTask as apiCreateTask,
   moveTask as apiMoveTask,
+  updateTask as apiUpdateTask,
+  deleteTask as apiDeleteTask,
 } from "../api/tasks";
+import type { UpdateTaskInput } from "../api/tasks";
 
 interface BoardContextValue {
   board: Board | null;
@@ -31,6 +34,8 @@ interface BoardContextValue {
   reorderColumns: (columnIds: string[]) => Promise<void>;
   createTask: (columnName: string, title: string) => Promise<Task>;
   moveTask: (taskId: string, status: string, position: number) => Promise<void>;
+  updateTask: (taskId: string, updates: UpdateTaskInput) => Promise<Task>;
+  removeTask: (taskId: string) => Promise<void>;
   setTasks: Dispatch<SetStateAction<Task[]>>;
 }
 
@@ -215,6 +220,26 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     [board, tasks],
   );
 
+  const updateTask = useCallback(
+    async (taskId: string, updates: UpdateTaskInput): Promise<Task> => {
+      const response = await apiUpdateTask(taskId, updates);
+      const updatedTask = response.data;
+      setTasks((prev) =>
+        prev.map((t) => (t._id === taskId ? updatedTask : t)),
+      );
+      return updatedTask;
+    },
+    [],
+  );
+
+  const removeTask = useCallback(
+    async (taskId: string): Promise<void> => {
+      await apiDeleteTask(taskId);
+      setTasks((prev) => prev.filter((t) => t._id !== taskId));
+    },
+    [],
+  );
+
   return (
     <BoardContext.Provider
       value={{
@@ -229,6 +254,8 @@ export function BoardProvider({ children }: { children: ReactNode }) {
         reorderColumns,
         createTask,
         moveTask,
+        updateTask,
+        removeTask,
         setTasks,
       }}
     >

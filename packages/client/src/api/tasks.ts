@@ -23,6 +23,12 @@ export interface MoveTaskInput {
   position: number;
 }
 
+export async function fetchTask(
+  taskId: string,
+): Promise<ApiSuccessResponse<Task>> {
+  return apiClient.get<ApiSuccessResponse<Task>>(`/api/tasks/${taskId}`);
+}
+
 export async function createTask(
   boardId: string,
   input: CreateTaskInput,

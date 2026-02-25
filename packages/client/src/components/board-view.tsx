@@ -24,8 +24,15 @@ import { TaskCard } from "./task-card";
 import { AddTaskForm } from "./add-task-form";
 import { LoadingSpinner } from "./ui/loading-spinner";
 import { ErrorMessage } from "./ui/error-message";
+import { TaskDetailPanel } from "./task-detail-panel";
 
-function SortableTaskItem({ task }: { task: Task }) {
+function SortableTaskItem({
+  task,
+  onClick,
+}: {
+  task: Task;
+  onClick?: (taskId: string) => void;
+}) {
   const {
     attributes,
     listeners,
@@ -46,7 +53,7 @@ function SortableTaskItem({ task }: { task: Task }) {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <TaskCard task={task} />
+      <TaskCard task={task} onClick={onClick} />
     </div>
   );
 }
@@ -72,6 +79,8 @@ export function BoardView() {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
   const tasksSnapshot = useRef<Task[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const hasDraggedRef = useRef(false);
 
   useEffect(() => {
     if (isAddingColumn && addColumnInputRef.current) {
@@ -164,6 +173,12 @@ export function BoardView() {
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
+    // Set drag guard to prevent click-through to TaskDetailPanel
+    hasDraggedRef.current = true;
+    requestAnimationFrame(() => {
+      hasDraggedRef.current = false;
+    });
+
     // Clear active state
     setActiveTask(null);
     setActiveColumnId(null);
@@ -223,6 +238,11 @@ export function BoardView() {
       setTasks(tasksSnapshot.current);
       moveTask(activeTaskId, finalStatus, finalPosition);
     }
+  }
+
+  function handleTaskClick(taskId: string) {
+    if (hasDraggedRef.current) return;
+    setSelectedTaskId(taskId);
   }
 
   async function handleAddColumn() {
@@ -305,7 +325,7 @@ export function BoardView() {
                   strategy={verticalListSortingStrategy}
                 >
                   {columnTasks.map((task) => (
-                    <SortableTaskItem key={task._id} task={task} />
+                    <SortableTaskItem key={task._id} task={task} onClick={handleTaskClick} />
                   ))}
                 </SortableContext>
               </Column>
@@ -360,6 +380,13 @@ export function BoardView() {
           </div>
         ) : null}
       </DragOverlay>
+
+      {selectedTaskId && (
+        <TaskDetailPanel
+          taskId={selectedTaskId}
+          onClose={() => setSelectedTaskId(null)}
+        />
+      )}
     </DndContext>
   );
 }
