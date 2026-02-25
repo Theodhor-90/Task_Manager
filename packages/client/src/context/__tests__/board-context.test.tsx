@@ -12,6 +12,8 @@ import {
 import {
   createTask as apiCreateTask,
   moveTask as apiMoveTask,
+  updateTask as apiUpdateTask,
+  deleteTask as apiDeleteTask,
 } from "../../api/tasks";
 
 vi.mock("../../api/boards", () => ({
@@ -26,6 +28,8 @@ vi.mock("../../api/boards", () => ({
 vi.mock("../../api/tasks", () => ({
   createTask: vi.fn(),
   moveTask: vi.fn(),
+  updateTask: vi.fn(),
+  deleteTask: vi.fn(),
 }));
 
 const mockFetchBoard = fetchBoard as ReturnType<typeof vi.fn>;
@@ -36,6 +40,8 @@ const mockDeleteColumn = deleteColumn as ReturnType<typeof vi.fn>;
 const mockReorderColumns = reorderColumns as ReturnType<typeof vi.fn>;
 const mockApiCreateTask = apiCreateTask as ReturnType<typeof vi.fn>;
 const mockApiMoveTask = apiMoveTask as ReturnType<typeof vi.fn>;
+const mockApiUpdateTask = apiUpdateTask as ReturnType<typeof vi.fn>;
+const mockApiDeleteTask = apiDeleteTask as ReturnType<typeof vi.fn>;
 
 const mockBoard = {
   _id: "board1",
@@ -530,5 +536,97 @@ describe("BoardContext", () => {
     });
 
     expect(screen.getByTestId("task-count")).toHaveTextContent("0");
+  });
+
+  it("updateTask calls API and patches task in state", async () => {
+    mockFetchBoard.mockResolvedValue({ data: mockBoard });
+    mockFetchBoardTasks.mockResolvedValue({ data: mockTasks });
+    const updatedTask = {
+      ...mockTasks[0],
+      title: "Updated Title",
+      updatedAt: "2025-01-02T00:00:00.000Z",
+    };
+    mockApiUpdateTask.mockResolvedValue({ data: updatedTask });
+
+    renderWithProvider();
+
+    await act(async () => {
+      await testHookValues.loadBoard("proj1");
+    });
+
+    let result;
+    await act(async () => {
+      result = await testHookValues.updateTask("task1", { title: "Updated Title" });
+    });
+
+    expect(mockApiUpdateTask).toHaveBeenCalledWith("task1", { title: "Updated Title" });
+    expect(result).toEqual(updatedTask);
+    // Verify the task in state was updated
+    const statuses = screen.getByTestId("task-statuses").textContent;
+    expect(statuses).toContain("task1:To Do:0");
+    expect(screen.getByTestId("task-count")).toHaveTextContent("1");
+  });
+
+  it("updateTask does not modify state on API failure", async () => {
+    mockFetchBoard.mockResolvedValue({ data: mockBoard });
+    mockFetchBoardTasks.mockResolvedValue({ data: mockTasks });
+    mockApiUpdateTask.mockRejectedValue(new Error("Update failed"));
+
+    renderWithProvider();
+
+    await act(async () => {
+      await testHookValues.loadBoard("proj1");
+    });
+
+    await expect(
+      act(async () => {
+        await testHookValues.updateTask("task1", { title: "New" });
+      }),
+    ).rejects.toThrow("Update failed");
+
+    // State unchanged
+    expect(screen.getByTestId("task-count")).toHaveTextContent("1");
+  });
+
+  it("removeTask calls API and removes task from state", async () => {
+    mockFetchBoard.mockResolvedValue({ data: mockBoard });
+    mockFetchBoardTasks.mockResolvedValue({ data: mockTasks });
+    mockApiDeleteTask.mockResolvedValue({ data: { message: "Task deleted" } });
+
+    renderWithProvider();
+
+    await act(async () => {
+      await testHookValues.loadBoard("proj1");
+    });
+
+    expect(screen.getByTestId("task-count")).toHaveTextContent("1");
+
+    await act(async () => {
+      await testHookValues.removeTask("task1");
+    });
+
+    expect(mockApiDeleteTask).toHaveBeenCalledWith("task1");
+    expect(screen.getByTestId("task-count")).toHaveTextContent("0");
+  });
+
+  it("removeTask does not modify state on API failure", async () => {
+    mockFetchBoard.mockResolvedValue({ data: mockBoard });
+    mockFetchBoardTasks.mockResolvedValue({ data: mockTasks });
+    mockApiDeleteTask.mockRejectedValue(new Error("Delete failed"));
+
+    renderWithProvider();
+
+    await act(async () => {
+      await testHookValues.loadBoard("proj1");
+    });
+
+    await expect(
+      act(async () => {
+        await testHookValues.removeTask("task1");
+      }),
+    ).rejects.toThrow("Delete failed");
+
+    // State unchanged
+    expect(screen.getByTestId("task-count")).toHaveTextContent("1");
   });
 });
