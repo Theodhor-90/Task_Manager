@@ -1,3 +1,19 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Markdown preview styling */
+.prose-custom h1 { font-size: 1.5em; font-weight: 700; margin: 0.5em 0; }
+.prose-custom h2 { font-size: 1.25em; font-weight: 600; margin: 0.5em 0; }
+.prose-custom h3 { font-size: 1.125em; font-weight: 600; margin: 0.5em 0; }
+.prose-custom p { margin: 0.5em 0; }
+.prose-custom ul { list-style-type: disc; padding-left: 1.5em; margin: 0.5em 0; }
+.prose-custom ol { list-style-type: decimal; padding-left: 1.5em; margin: 0.5em 0; }
+.prose-custom li { margin: 0.25em 0; }
+.prose-custom a { color: #2563eb; text-decoration: underline; }
+.prose-custom code { background-color: #f3f4f6; padding: 0.125em 0.25em; border-radius: 0.25em; font-size: 0.875em; }
+.prose-custom pre { background-color: #f3f4f6; padding: 0.75em; border-radius: 0.375em; overflow-x: auto; margin: 0.5em 0; }
+.prose-custom pre code { background-color: transparent; padding: 0; }
+.prose-custom blockquote { border-left: 3px solid #d1d5db; padding-left: 0.75em; color: #6b7280; margin: 0.5em 0; }
+.prose-custom hr { border-color: #e5e7eb; margin: 1em 0; }
+.prose-custom strong { font-weight: 600; }

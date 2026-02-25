@@ -14,6 +14,11 @@ vi.mock("../ui/error-message", () => ({
     <div data-testid="error-message">{message}</div>
   ),
 }));
+vi.mock("react-markdown", () => ({
+  default: ({ children }: { children: string }) => (
+    <div data-testid="markdown-preview">{children}</div>
+  ),
+}));
 
 // Import mocked modules
 import { fetchTask } from "../../api/tasks";
@@ -31,6 +36,12 @@ const mockTask: Task = {
   project: "proj1",
   createdAt: "2025-01-01T00:00:00.000Z",
   updatedAt: "2025-01-01T00:00:00.000Z",
+};
+
+const mockTaskNoDescription: Task = {
+  ...mockTask,
+  _id: "task2",
+  description: "",
 };
 
 interface TaskDetailPanelProps {
@@ -377,5 +388,205 @@ describe("TaskDetailPanel", () => {
     fireEvent.click(title);
 
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("defaults to Preview tab when description exists", async () => {
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("markdown-preview")).toBeInTheDocument();
+    });
+
+    // Preview tab should be active (has blue styling)
+    const previewTab = screen.getByRole("button", { name: "Preview" });
+    expect(previewTab).toHaveClass("text-blue-600");
+  });
+
+  it("defaults to Write tab when description is empty", async () => {
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTaskNoDescription } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Task description")).toBeInTheDocument();
+    });
+
+    const writeTab = screen.getByRole("button", { name: "Write" });
+    expect(writeTab).toHaveClass("text-blue-600");
+  });
+
+  it("renders textarea in Write tab with current description", async () => {
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("markdown-preview")).toBeInTheDocument();
+    });
+
+    // Switch to Write tab
+    fireEvent.click(screen.getByRole("button", { name: "Write" }));
+
+    const textarea = screen.getByLabelText("Task description") as HTMLTextAreaElement;
+    expect(textarea).toBeInTheDocument();
+    expect(textarea.value).toBe("Some description");
+  });
+
+  it("renders markdown content in Preview tab", async () => {
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("markdown-preview")).toHaveTextContent("Some description");
+    });
+  });
+
+  it("switches between Write and Preview tabs", async () => {
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("markdown-preview")).toBeInTheDocument();
+    });
+
+    // Switch to Write
+    fireEvent.click(screen.getByRole("button", { name: "Write" }));
+    expect(screen.getByLabelText("Task description")).toBeInTheDocument();
+    expect(screen.queryByTestId("markdown-preview")).not.toBeInTheDocument();
+
+    // Switch back to Preview
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+    expect(screen.getByTestId("markdown-preview")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Task description")).not.toBeInTheDocument();
+  });
+
+  it("description saves on blur when changed", async () => {
+    const mockUpdateTask = vi.fn().mockResolvedValue({
+      ...mockTask,
+      description: "Updated description",
+    });
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("markdown-preview")).toBeInTheDocument();
+    });
+
+    // Switch to Write tab
+    fireEvent.click(screen.getByRole("button", { name: "Write" }));
+
+    const textarea = screen.getByLabelText("Task description");
+    fireEvent.change(textarea, { target: { value: "Updated description" } });
+    fireEvent.blur(textarea);
+
+    await waitFor(() => {
+      expect(mockUpdateTask).toHaveBeenCalledWith("task1", { description: "Updated description" });
+    });
+  });
+
+  it("description does not save on blur when unchanged", async () => {
+    const mockUpdateTask = vi.fn();
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("markdown-preview")).toBeInTheDocument();
+    });
+
+    // Switch to Write tab
+    fireEvent.click(screen.getByRole("button", { name: "Write" }));
+
+    const textarea = screen.getByLabelText("Task description");
+    fireEvent.blur(textarea);
+
+    expect(mockUpdateTask).not.toHaveBeenCalled();
+  });
+
+  it("shows placeholder when description is empty in Preview mode", async () => {
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTaskNoDescription } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: vi.fn() } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Task description")).toBeInTheDocument();
+    });
+
+    // Switch to Preview tab
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    expect(screen.getByText("Add a description...")).toBeInTheDocument();
+    expect(screen.queryByTestId("markdown-preview")).not.toBeInTheDocument();
+  });
+
+  it("description save failure reverts to current description", async () => {
+    const mockUpdateTask = vi.fn().mockRejectedValue(new Error("Save failed"));
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("markdown-preview")).toBeInTheDocument();
+    });
+
+    // Switch to Write tab
+    fireEvent.click(screen.getByRole("button", { name: "Write" }));
+
+    const textarea = screen.getByLabelText("Task description") as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: "Bad description" } });
+    fireEvent.blur(textarea);
+
+    await waitFor(() => {
+      expect(mockUpdateTask).toHaveBeenCalled();
+    });
+
+    // After failure, textarea value should revert
+    await waitFor(() => {
+      expect((screen.getByLabelText("Task description") as HTMLTextAreaElement).value).toBe("Some description");
+    });
+  });
+
+  it("Preview tab shows updated content after editing in Write tab", async () => {
+    const mockUpdateTask = vi.fn().mockResolvedValue({
+      ...mockTask,
+      description: "New content",
+    });
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({ updateTask: mockUpdateTask } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("markdown-preview")).toBeInTheDocument();
+    });
+
+    // Switch to Write, edit, blur to save
+    fireEvent.click(screen.getByRole("button", { name: "Write" }));
+    const textarea = screen.getByLabelText("Task description");
+    fireEvent.change(textarea, { target: { value: "New content" } });
+    fireEvent.blur(textarea);
+
+    await waitFor(() => {
+      expect(mockUpdateTask).toHaveBeenCalled();
+    });
+
+    // Switch to Preview
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    expect(screen.getByTestId("markdown-preview")).toHaveTextContent("New content");
   });
 });
