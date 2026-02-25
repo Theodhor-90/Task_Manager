@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { Task } from "@taskboard/shared";
 import { useBoard } from "../context/board-context";
+import { LabelManager } from "./label-manager";
 
 interface LabelPickerProps {
   taskId: string;
@@ -108,18 +109,7 @@ export function LabelPicker({ taskId, labels: taskLabels, onUpdate }: LabelPicke
       )}
 
       {showManager && (
-        <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Label manager (coming in Task 7)</span>
-            <button
-              onClick={() => setShowManager(false)}
-              className="text-sm text-gray-400 hover:text-gray-600"
-              aria-label="Close label manager"
-            >
-              ×
-            </button>
-          </div>
-        </div>
+        <LabelManager onClose={() => setShowManager(false)} />
       )}
     </div>
   );
