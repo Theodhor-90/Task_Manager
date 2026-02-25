@@ -133,6 +133,58 @@ vi.mock("../task-detail-panel", () => ({
   ),
 }));
 
+vi.mock("../filter-bar", () => {
+  let capturedOnFilterChange: ((filters: any) => void) | undefined;
+  return {
+    FilterBar: ({
+      onFilterChange,
+      totalCount,
+      filteredCount,
+    }: {
+      onFilterChange: (filters: any) => void;
+      totalCount: number;
+      filteredCount: number;
+    }) => {
+      capturedOnFilterChange = onFilterChange;
+      return (
+        <div data-testid="filter-bar" data-total={totalCount} data-filtered={filteredCount}>
+          <button
+            data-testid="apply-label-filter"
+            onClick={() => onFilterChange({ labels: ["label1"], priorities: [], dueDateFrom: null, dueDateTo: null })}
+          >
+            Filter by label
+          </button>
+          <button
+            data-testid="apply-priority-filter"
+            onClick={() => onFilterChange({ labels: [], priorities: ["high"], dueDateFrom: null, dueDateTo: null })}
+          >
+            Filter by priority
+          </button>
+          <button
+            data-testid="apply-due-date-filter"
+            onClick={() => onFilterChange({ labels: [], priorities: [], dueDateFrom: "2026-01-01", dueDateTo: "2026-03-31" })}
+          >
+            Filter by due date
+          </button>
+          <button
+            data-testid="apply-combined-filter"
+            onClick={() => onFilterChange({ labels: ["label1"], priorities: ["high"], dueDateFrom: null, dueDateTo: null })}
+          >
+            Combined filter
+          </button>
+          <button
+            data-testid="clear-filters"
+            onClick={() => onFilterChange({ labels: [], priorities: [], dueDateFrom: null, dueDateTo: null })}
+          >
+            Clear filters
+          </button>
+        </div>
+      );
+    },
+    __getCapturedOnFilterChange: () => capturedOnFilterChange,
+  };
+});
+
 const mockBoard = {
   _id: "board1",
   project: "proj1",
@@ -184,10 +236,65 @@ const mockTasks = [
   },
 ];
 
+const mockTasksWithFilters = [
+  {
+    _id: "task1",
+    title: "Write tests",
+    status: "To Do",
+    priority: "high" as const,
+    position: 1,
+    labels: ["label1"],
+    board: "board1",
+    project: "proj1",
+    dueDate: "2026-02-15T00:00:00.000Z",
+    createdAt: "2025-01-01T00:00:00.000Z",
+    updatedAt: "2025-01-01T00:00:00.000Z",
+  },
+  {
+    _id: "task2",
+    title: "Setup project",
+    status: "To Do",
+    priority: "medium" as const,
+    position: 0,
+    labels: ["label2"],
+    board: "board1",
+    project: "proj1",
+    dueDate: "2026-05-01T00:00:00.000Z",
+    createdAt: "2025-01-01T00:00:00.000Z",
+    updatedAt: "2025-01-01T00:00:00.000Z",
+  },
+  {
+    _id: "task3",
+    title: "Deploy app",
+    status: "In Progress",
+    priority: "low" as const,
+    position: 0,
+    labels: [],
+    board: "board1",
+    project: "proj1",
+    createdAt: "2025-01-01T00:00:00.000Z",
+    updatedAt: "2025-01-01T00:00:00.000Z",
+  },
+  {
+    _id: "task4",
+    title: "Code review",
+    status: "In Progress",
+    priority: "high" as const,
+    position: 1,
+    labels: ["label1", "label2"],
+    board: "board1",
+    project: "proj1",
+    dueDate: "2026-02-20T00:00:00.000Z",
+    createdAt: "2025-01-01T00:00:00.000Z",
+    updatedAt: "2025-01-01T00:00:00.000Z",
+  },
+];
+
 function defaultBoardState() {
   return {
     board: mockBoard,
     tasks: mockTasks,
+    labels: [],
     isLoading: false,
     error: null,
     loadBoard: vi.fn(),
@@ -591,5 +698,222 @@ describe("BoardView", () => {
       "data-task-id",
       "task2",
     );
+  });
+
+  it("renders FilterBar above the board columns", () => {
+    renderBoardView();
+    expect(screen.getByTestId("filter-bar")).toBeInTheDocument();
+  });
+
+  it("FilterBar receives correct totalCount and filteredCount when no filters active", () => {
+    renderBoardView();
+    const filterBar = screen.getByTestId("filter-bar");
+    expect(filterBar).toHaveAttribute("data-total", "3");
+    expect(filterBar).toHaveAttribute("data-filtered", "3");
+  });
+
+  it("label filter hides tasks without matching labels", () => {
+    renderBoardView({ tasks: mockTasksWithFilters });
+
+    // Before filtering: all 4 tasks visible
+    expect(screen.getByTestId("task-card-task1")).toBeInTheDocument();
+    expect(screen.getByTestId("task-card-task2")).toBeInTheDocument();
+    expect(screen.getByTestId("task-card-task3")).toBeInTheDocument();
+    expect(screen.getByTestId("task-card-task4")).toBeInTheDocument();
+
+    // Apply label filter (label1)
+    fireEvent.click(screen.getByTestId("apply-label-filter"));
+
+    // task1 has label1, task4 has label1 — visible
+    expect(screen.getByTestId("task-card-task1")).toBeInTheDocument();
+    expect(screen.getByTestId("task-card-task4")).toBeInTheDocument();
+    // task2 has label2, task3 has no labels — hidden
+    expect(screen.queryByTestId("task-card-task2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("task-card-task3")).not.toBeInTheDocument();
+  });
+
+  it("priority filter hides tasks without matching priority", () => {
+    renderBoardView({ tasks: mockTasksWithFilters });
+
+    // Apply priority filter (high)
+    fireEvent.click(screen.getByTestId("apply-priority-filter"));
+
+    // task1 is high, task4 is high — visible
+    expect(screen.getByTestId("task-card-task1")).toBeInTheDocument();
+    expect(screen.getByTestId("task-card-task4")).toBeInTheDocument();
+    // task2 is medium, task3 is low — hidden
+    expect(screen.queryByTestId("task-card-task2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("task-card-task3")).not.toBeInTheDocument();
+  });
+
+  it("due date filter hides tasks outside range and tasks without dueDate", () => {
+    renderBoardView({ tasks: mockTasksWithFilters });
+
+    // Apply due date filter (2026-01-01 to 2026-03-31)
+    fireEvent.click(screen.getByTestId("apply-due-date-filter"));
+
+    // task1 due Feb 15 — in range, visible
+    expect(screen.getByTestId("task-card-task1")).toBeInTheDocument();
+    // task4 due Feb 20 — in range, visible
+    expect(screen.getByTestId("task-card-task4")).toBeInTheDocument();
+    // task2 due May 1 — outside range, hidden
+    expect(screen.queryByTestId("task-card-task2")).not.toBeInTheDocument();
+    // task3 has no dueDate — excluded when date filter active, hidden
+    expect(screen.queryByTestId("task-card-task3")).not.toBeInTheDocument();
+  });
+
+  it("combined filters use AND logic across filter types", () => {
+    renderBoardView({ tasks: mockTasksWithFilters });
+
+    // Apply combined filter: label1 AND priority high
+    fireEvent.click(screen.getByTestId("apply-combined-filter"));
+
+    // task1: label1 + high → matches both → visible
+    expect(screen.getByTestId("task-card-task1")).toBeInTheDocument();
+    // task4: label1 + high → matches both → visible
+    expect(screen.getByTestId("task-card-task4")).toBeInTheDocument();
+    // task2: label2 + medium → fails priority → hidden
+    expect(screen.queryByTestId("task-card-task2")).not.toBeInTheDocument();
+    // task3: no labels + low → fails both → hidden
+    expect(screen.queryByTestId("task-card-task3")).not.toBeInTheDocument();
+  });
+
+  it("clearing all filters restores the full board", () => {
+    renderBoardView({ tasks: mockTasksWithFilters });
+
+    // Apply label filter
+    fireEvent.click(screen.getByTestId("apply-label-filter"));
+    expect(screen.queryByTestId("task-card-task2")).not.toBeInTheDocument();
+
+    // Clear filters
+    fireEvent.click(screen.getByTestId("clear-filters"));
+
+    // All tasks visible again
+    expect(screen.getByTestId("task-card-task1")).toBeInTheDocument();
+    expect(screen.getByTestId("task-card-task2")).toBeInTheDocument();
+    expect(screen.getByTestId("task-card-task3")).toBeInTheDocument();
+    expect(screen.getByTestId("task-card-task4")).toBeInTheDocument();
+  });
+
+  it("FilterBar receives updated filteredCount when filters are active", () => {
+    renderBoardView({ tasks: mockTasksWithFilters });
+
+    const filterBar = screen.getByTestId("filter-bar");
+    expect(filterBar).toHaveAttribute("data-total", "4");
+    expect(filterBar).toHaveAttribute("data-filtered", "4");
+
+    // Apply label filter (label1) — should match task1 and task4
+    fireEvent.click(screen.getByTestId("apply-label-filter"));
+
+    expect(filterBar).toHaveAttribute("data-total", "4");
+    expect(filterBar).toHaveAttribute("data-filtered", "2");
+  });
+
+  it("intra-column reorder is blocked when filters are active", () => {
+    const state = renderBoardView({ tasks: mockTasksWithFilters });
+
+    // Activate a filter
+    fireEvent.click(screen.getByTestId("apply-label-filter"));
+
+    act(() => {
+      // Simulate drag start
+      capturedOnDragStart!({
+        active: {
+          id: "task1",
+          data: { current: { type: "task", task: mockTasksWithFilters[0] } },
+        },
+      });
+
+      // Simulate drag end — same column reorder (task1 dropped on task4 would be cross-column,
+      // but let's drop on a same-column target by simulating dropping on a task in "To Do")
+      capturedOnDragEnd!({
+        active: {
+          id: "task1",
+          data: { current: { type: "task", task: mockTasksWithFilters[0] } },
+        },
+        over: {
+          id: "task1",
+          data: { current: { type: "task", task: mockTasksWithFilters[0] } },
+        },
+      });
+    });
+
+    // moveTask should NOT have been called (same-column reorder blocked by filter guard)
+    expect(state.moveTask).not.toHaveBeenCalled();
+  });
+
+  it("column reorder still works when filters are active", () => {
+    const state = renderBoardView({ tasks: mockTasksWithFilters });
+
+    // Activate a filter
+    fireEvent.click(screen.getByTestId("apply-label-filter"));
+
+    // Column reorder drag
+    act(() => {
+      capturedOnDragEnd!({
+        active: { id: "col1", data: { current: { type: "column" } } },
+        over: { id: "col3", data: { current: { type: "column" } } },
+      });
+    });
+
+    expect(state.reorderColumns).toHaveBeenCalledWith(["col2", "col3", "col1"]);
+  });
+
+  it("visual indicator appears when filters are active and column has tasks", () => {
+    renderBoardView({ tasks: mockTasksWithFilters });
+
+    // Before filtering — no indicator
+    expect(screen.queryByText("Reordering disabled while filters are active")).not.toBeInTheDocument();
+
+    // Apply label filter — task1 and task4 visible
+    fireEvent.click(screen.getByTestId("apply-label-filter"));
+
+    // Indicator should appear in columns that have visible tasks
+    const indicators = screen.getAllByText("Reordering disabled while filters are active");
+    expect(indicators.length).toBeGreaterThan(0);
+  });
+
+  it("visual indicator disappears when filters are cleared", () => {
+    renderBoardView({ tasks: mockTasksWithFilters });
+
+    // Apply filter
+    fireEvent.click(screen.getByTestId("apply-label-filter"));
+    expect(screen.queryAllByText("Reordering disabled while filters are active").length).toBeGreaterThan(0);
+
+    // Clear filters
+    fireEvent.click(screen.getByTestId("clear-filters"));
+    expect(screen.queryAllByText("Reordering disabled while filters are active")).toHaveLength(0);
+  });
+
+  it("task count shows unfiltered count when filters are active", () => {
+    renderBoardView({ tasks: mockTasksWithFilters });
+
+    // Before filtering: "To Do" has 2 tasks (task1, task2)
+    expect(screen.getByTestId("column-count-col1")).toHaveTextContent("2");
+
+    // Apply label filter (label1) — only task1 visible in "To Do"
+    fireEvent.click(screen.getByTestId("apply-label-filter"));
+
+    // Column count should still show 2 (unfiltered count)
+    expect(screen.getByTestId("column-count-col1")).toHaveTextContent("2");
+  });
+
+  it("add column UI is unaffected by active filters", async () => {
+    const state = renderBoardView({ tasks: mockTasksWithFilters });
+
+    // Activate a filter
+    fireEvent.click(screen.getByTestId("apply-label-filter"));
+
+    // Add column UI should still work
+    fireEvent.click(screen.getByText("+ Add Column"));
+    expect(screen.getByLabelText("New column name")).toBeInTheDocument();
+
+    const input = screen.getByLabelText("New column name");
+    fireEvent.change(input, { target: { value: "QA" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(state.addColumn).toHaveBeenCalledWith("QA");
+    });
   });
 });

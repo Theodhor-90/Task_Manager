@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -17,7 +17,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Task } from "@taskboard/shared";
+import type { Priority, Task } from "@taskboard/shared";
 import { useBoard } from "../context/board-context";
 import { Column } from "./column";
 import { TaskCard } from "./task-card";
@@ -25,13 +25,17 @@ import { AddTaskForm } from "./add-task-form";
 import { LoadingSpinner } from "./ui/loading-spinner";
 import { ErrorMessage } from "./ui/error-message";
 import { TaskDetailPanel } from "./task-detail-panel";
+import { FilterBar } from "./filter-bar";
+import type { FilterState } from "./filter-bar";
 
 function SortableTaskItem({
   task,
   onClick,
+  disabled,
 }: {
   task: Task;
   onClick?: (taskId: string) => void;
+  disabled?: boolean;
 }) {
   const {
     attributes,
@@ -43,6 +47,7 @@ function SortableTaskItem({
   } = useSortable({
     id: task._id,
     data: { type: "task", task },
+    disabled: disabled ? { droppable: true } : undefined,
   });
 
   const style = {
@@ -81,6 +86,52 @@ export function BoardView() {
   const tasksSnapshot = useRef<Task[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const hasDraggedRef = useRef(false);
+
+  const [filters, setFilters] = useState<FilterState>({
+    labels: [],
+    priorities: [],
+    dueDateFrom: null,
+    dueDateTo: null,
+  });
+
+  const hasActiveFilters = useMemo(
+    () =>
+      filters.labels.length > 0 ||
+      filters.priorities.length > 0 ||
+      filters.dueDateFrom !== null ||
+      filters.dueDateTo !== null,
+    [filters],
+  );
+
+  const filteredTasks = useMemo(() => {
+    if (!hasActiveFilters) return tasks;
+
+    return tasks.filter((task) => {
+      // Label filter: task must have at least one of the selected labels (OR logic)
+      if (filters.labels.length > 0) {
+        const hasMatchingLabel = task.labels.some((labelId) =>
+          filters.labels.includes(labelId),
+        );
+        if (!hasMatchingLabel) return false;
+      }
+
+      // Priority filter: task's priority must match one of the selected priorities (OR logic)
+      if (filters.priorities.length > 0) {
+        if (!filters.priorities.includes(task.priority as Priority)) return false;
+      }
+
+      // Due date filter: task's dueDate must fall within range (inclusive)
+      // Tasks without a dueDate are excluded when any date filter is active
+      if (filters.dueDateFrom || filters.dueDateTo) {
+        if (!task.dueDate) return false;
+        const taskDate = task.dueDate.slice(0, 10);
+        if (filters.dueDateFrom && taskDate < filters.dueDateFrom) return false;
+        if (filters.dueDateTo && taskDate > filters.dueDateTo) return false;
+      }
+
+      return true;
+    });
+  }, [tasks, filters, hasActiveFilters]);
 
   useEffect(() => {
     if (isAddingColumn && addColumnInputRef.current) {
@@ -209,6 +260,15 @@ export function BoardView() {
 
       const finalStatus = currentTask.status;
 
+      // Guard: skip same-column reorder when filters are active
+      if (hasActiveFilters) {
+        const snapshotTask = tasksSnapshot.current.find((t) => t._id === activeTaskId);
+        if (snapshotTask && snapshotTask.status === finalStatus) {
+          setTasks(tasksSnapshot.current);
+          return;
+        }
+      }
+
       // Compute final position
       let finalPosition: number;
 
@@ -298,12 +358,20 @@ export function BoardView() {
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
+      <FilterBar
+        onFilterChange={setFilters}
+        totalCount={tasks.length}
+        filteredCount={filteredTasks.length}
+      />
+
       <SortableContext items={columnIds} strategy={horizontalListSortingStrategy}>
         <div className="flex gap-4 overflow-x-auto p-4">
           {board.columns.map((column) => {
-            const columnTasks = tasks
+            const columnTasks = filteredTasks
               .filter((t) => t.status === column.name)
               .sort((a, b) => a.position - b.position);
+
+            const allColumnTasks = tasks.filter((t) => t.status === column.name);
 
             const taskIds = columnTasks.map((t) => t._id);
 
@@ -311,7 +379,7 @@ export function BoardView() {
               <Column
                 key={column._id}
                 column={column}
-                taskCount={columnTasks.length}
+                taskCount={allColumnTasks.length}
                 onRename={async (columnId, name) => {
                   await renameColumn(columnId, name);
                 }}
@@ -325,9 +393,19 @@ export function BoardView() {
                   strategy={verticalListSortingStrategy}
                 >
                   {columnTasks.map((task) => (
-                    <SortableTaskItem key={task._id} task={task} onClick={handleTaskClick} />
+                    <SortableTaskItem
+                      key={task._id}
+                      task={task}
+                      onClick={handleTaskClick}
+                      disabled={hasActiveFilters}
+                    />
                   ))}
                 </SortableContext>
+                {hasActiveFilters && columnTasks.length > 0 && (
+                  <p className="px-2 py-1 text-xs text-gray-400 italic">
+                    Reordering disabled while filters are active
+                  </p>
+                )}
               </Column>
             );
           })}
