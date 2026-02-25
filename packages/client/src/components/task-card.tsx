@@ -1,4 +1,5 @@
-import type { Priority, Task } from "@taskboard/shared";
+import type { Label, Priority, Task } from "@taskboard/shared";
+import { useBoard } from "../context/board-context";
 
 interface TaskCardProps {
   task: Task;
@@ -24,6 +25,9 @@ function isOverdue(isoDate: string): boolean {
 }
 
 export function TaskCard({ task, onClick }: TaskCardProps) {
+  const { labels } = useBoard();
+  const labelMap = new Map<string, Label>(labels.map((l) => [l._id, l]));
+
   return (
     <div
       className="mb-2 cursor-pointer rounded-lg bg-white p-3 shadow-sm hover:shadow-md transition-shadow"
@@ -54,13 +58,19 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
 
         {task.labels.length > 0 && (
           <div className="flex gap-1">
-            {task.labels.map((labelId) => (
-              <span
-                key={labelId}
-                className="h-2 w-2 rounded-full bg-gray-400"
-                aria-label="Label"
-              />
-            ))}
+            {task.labels.map((labelId) => {
+              const label = labelMap.get(labelId);
+              if (!label) return null;
+              return (
+                <span
+                  key={labelId}
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: label.color }}
+                  title={label.name}
+                  aria-label={label.name}
+                />
+              );
+            })}
           </div>
         )}
 
