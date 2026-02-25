@@ -5,6 +5,7 @@ import { fetchTask } from "../api/tasks";
 import { useBoard } from "../context/board-context";
 import { LoadingSpinner } from "./ui/loading-spinner";
 import { ErrorMessage } from "./ui/error-message";
+import { ConfirmDialog } from "./ui/confirm-dialog";
 import Markdown from "react-markdown";
 import { PRIORITY_CLASSES } from "./task-card";
 
@@ -28,10 +29,12 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
   const [editTitle, setEditTitle] = useState("");
   const [descriptionTab, setDescriptionTab] = useState<"write" | "preview">("preview");
   const [editDescription, setEditDescription] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
-  const { updateTask } = useBoard();
+  const { updateTask, removeTask } = useBoard();
 
   // Data loading effect
   useEffect(() => {
@@ -67,6 +70,10 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (showConfirm) {
+          // Let the ConfirmDialog handle its own Escape
+          return;
+        }
         if (isEditingTitle) {
           // Cancel title editing instead of closing the panel
           setEditTitle(task?.title ?? "");
@@ -79,7 +86,7 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, isEditingTitle, task]);
+  }, [onClose, isEditingTitle, task, showConfirm]);
 
   // Body scroll lock
   useEffect(() => {
@@ -176,6 +183,18 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
       setTask(updated);
     } catch {
       // No revert needed — input re-renders with task.dueDate
+    }
+  }
+
+  async function handleDelete() {
+    setShowConfirm(false);
+    setDeleteError(null);
+    try {
+      await removeTask(taskId);
+      onClose();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to delete task";
+      setDeleteError(message);
     }
   }
 
@@ -341,6 +360,32 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
                   </div>
                 </div>
               </div>
+
+              {/* Delete error */}
+              {deleteError && (
+                <div className="mt-6">
+                  <ErrorMessage message={deleteError} onDismiss={() => setDeleteError(null)} />
+                </div>
+              )}
+
+              {/* Delete task button */}
+              <div className="mt-6 border-t border-gray-200 pt-4">
+                <button
+                  onClick={() => setShowConfirm(true)}
+                  className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                >
+                  Delete task
+                </button>
+              </div>
+
+              {/* Confirm dialog for delete */}
+              <ConfirmDialog
+                isOpen={showConfirm}
+                message="Are you sure you want to delete this task? This action cannot be undone."
+                confirmLabel="Delete"
+                onConfirm={handleDelete}
+                onCancel={() => setShowConfirm(false)}
+              />
             </>
           )}
         </div>

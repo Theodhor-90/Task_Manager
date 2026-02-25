@@ -10,8 +10,15 @@ vi.mock("../ui/loading-spinner", () => ({
   LoadingSpinner: () => <div data-testid="loading-spinner">Loading...</div>,
 }));
 vi.mock("../ui/error-message", () => ({
-  ErrorMessage: ({ message }: { message: string }) => (
-    <div data-testid="error-message">{message}</div>
+  ErrorMessage: ({ message, onDismiss }: { message: string; onDismiss?: () => void }) => (
+    <div data-testid="error-message">
+      {message}
+      {onDismiss && (
+        <button onClick={onDismiss} aria-label="Dismiss">
+          ×
+        </button>
+      )}
+    </div>
   ),
 }));
 vi.mock("react-markdown", () => ({
@@ -783,5 +790,176 @@ describe("TaskDetailPanel", () => {
     });
 
     expect(screen.queryByLabelText("Clear due date")).not.toBeInTheDocument();
+  });
+
+  it("delete button is visible in the panel", async () => {
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({
+      updateTask: vi.fn(),
+      removeTask: vi.fn(),
+    } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("button", { name: "Delete task" })).toBeInTheDocument();
+  });
+
+  it("clicking delete button opens confirmation dialog", async () => {
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({
+      updateTask: vi.fn(),
+      removeTask: vi.fn(),
+    } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete task" }));
+
+    expect(
+      screen.getByText("Are you sure you want to delete this task? This action cannot be undone."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+  });
+
+  it("canceling confirmation dialog does not delete task", async () => {
+    const mockRemoveTask = vi.fn();
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({
+      updateTask: vi.fn(),
+      removeTask: mockRemoveTask,
+    } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete task" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(mockRemoveTask).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+  });
+
+  it("confirming deletion calls removeTask and closes panel", async () => {
+    const mockRemoveTask = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({
+      updateTask: vi.fn(),
+      removeTask: mockRemoveTask,
+    } as any);
+
+    const { onClose } = renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete task" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(mockRemoveTask).toHaveBeenCalledWith("task1");
+    });
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("delete failure shows error in panel", async () => {
+    const mockRemoveTask = vi.fn().mockRejectedValue(new Error("Delete failed"));
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({
+      updateTask: vi.fn(),
+      removeTask: mockRemoveTask,
+    } as any);
+
+    const { onClose } = renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete task" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(mockRemoveTask).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Delete failed")).toBeInTheDocument();
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("delete error can be dismissed", async () => {
+    const mockRemoveTask = vi.fn().mockRejectedValue(new Error("Delete failed"));
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({
+      updateTask: vi.fn(),
+      removeTask: mockRemoveTask,
+    } as any);
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete task" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Delete failed")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText("Dismiss"));
+
+    expect(screen.queryByText("Delete failed")).not.toBeInTheDocument();
+  });
+
+  it("Escape while confirm dialog is open does not close panel", async () => {
+    vi.mocked(fetchTask).mockResolvedValue({ data: mockTask } as any);
+    vi.mocked(useBoard).mockReturnValue({
+      updateTask: vi.fn(),
+      removeTask: vi.fn(),
+    } as any);
+
+    const { onClose } = renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete task" }));
+
+    expect(
+      screen.getByText("Are you sure you want to delete this task? This action cannot be undone."),
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    // Dialog should close but panel should remain open
+    await waitFor(() => {
+      expect(
+        screen.queryByText("Are you sure you want to delete this task? This action cannot be undone."),
+      ).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
