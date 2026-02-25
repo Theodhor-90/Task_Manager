@@ -155,7 +155,9 @@ describe("LoginPage", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
   });
 
   it("navigates to dashboard on successful login", async () => {

@@ -1,0 +1,1 @@
+The plan is ready to lock. All interfaces, import paths, mock patterns, and test structures match the actual codebase precisely. The 14 test cases fully cover the task spec's 8 verification criteria. No ambiguities, no over-engineering, no contradictions.

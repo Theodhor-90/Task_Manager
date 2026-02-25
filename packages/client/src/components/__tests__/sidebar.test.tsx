@@ -97,4 +97,101 @@ describe("Sidebar", () => {
     const link = screen.getByText("Project Beta");
     expect(link).toHaveClass("text-gray-700");
   });
+
+  it("reflects new project when projects prop is updated", () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <Sidebar projects={mockProjects} isLoading={false} onCreateProject={vi.fn()} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText("Project Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Project Beta")).toBeInTheDocument();
+
+    const updatedProjects: Project[] = [
+      {
+        _id: "proj3",
+        name: "Project Gamma",
+        owner: "user1",
+        createdAt: "2025-01-03T00:00:00Z",
+        updatedAt: "2025-01-03T00:00:00Z",
+      },
+      ...mockProjects,
+    ];
+
+    rerender(
+      <MemoryRouter>
+        <Sidebar projects={updatedProjects} isLoading={false} onCreateProject={vi.fn()} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("Project Gamma")).toBeInTheDocument();
+    expect(screen.getByText("Project Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Project Beta")).toBeInTheDocument();
+  });
+
+  it("reflects updated project name when projects prop changes", () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <Sidebar projects={mockProjects} isLoading={false} onCreateProject={vi.fn()} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText("Project Alpha")).toBeInTheDocument();
+
+    const updatedProjects: Project[] = [
+      {
+        ...mockProjects[0],
+        name: "Project Alpha Renamed",
+      },
+      mockProjects[1],
+    ];
+
+    rerender(
+      <MemoryRouter>
+        <Sidebar projects={updatedProjects} isLoading={false} onCreateProject={vi.fn()} />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByText("Project Alpha")).not.toBeInTheDocument();
+    expect(screen.getByText("Project Alpha Renamed")).toBeInTheDocument();
+    expect(screen.getByText("Project Beta")).toBeInTheDocument();
+  });
+
+  it("reflects removed project when projects prop changes", () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <Sidebar projects={mockProjects} isLoading={false} onCreateProject={vi.fn()} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText("Project Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Project Beta")).toBeInTheDocument();
+
+    const updatedProjects: Project[] = [mockProjects[1]];
+
+    rerender(
+      <MemoryRouter>
+        <Sidebar projects={updatedProjects} isLoading={false} onCreateProject={vi.fn()} />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByText("Project Alpha")).not.toBeInTheDocument();
+    expect(screen.getByText("Project Beta")).toBeInTheDocument();
+  });
+
+  it("shows empty state when last project is removed", () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <Sidebar projects={mockProjects} isLoading={false} onCreateProject={vi.fn()} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText("Project Alpha")).toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <Sidebar projects={[]} isLoading={false} onCreateProject={vi.fn()} />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByText("Project Alpha")).not.toBeInTheDocument();
+    expect(screen.getByText("No projects yet")).toBeInTheDocument();
+  });
 });

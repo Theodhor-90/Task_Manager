@@ -1,20 +1,49 @@
+import { useState } from "react";
+import type { Project } from "@taskboard/shared";
 import { useProjects } from "../context/projects-context";
 import { LoadingSpinner } from "../components/ui/loading-spinner";
 import { ErrorMessage } from "../components/ui/error-message";
+import { ProjectFormModal } from "../components/project-form-modal";
+import { ProjectCard } from "../components/project-card";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
 
 export function DashboardPage() {
-  const { projects, isLoading, error } = useProjects();
+  const { projects, isLoading, error, removeProject } = useProjects();
+
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDeleteConfirm() {
+    if (!deletingProject) return;
+    const projectToDelete = deletingProject;
+    setDeletingProject(null);
+    setDeleteError(null);
+    try {
+      await removeProject(projectToDelete._id);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete project");
+    }
+  }
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-2xl font-semibold text-gray-900">Projects</h2>
         <button
+          onClick={() => setIsCreateOpen(true)}
           className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           New Project
         </button>
       </div>
+
+      {deleteError && (
+        <div className="mb-4">
+          <ErrorMessage message={deleteError} onDismiss={() => setDeleteError(null)} />
+        </div>
+      )}
 
       {isLoading ? (
         <div className="py-12">
@@ -31,23 +60,34 @@ export function DashboardPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
-            <div
+            <ProjectCard
               key={project._id}
-              className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
-            >
-              <h3 className="font-medium text-gray-900">{project.name}</h3>
-              {project.description && (
-                <p className="mt-1 line-clamp-2 text-sm text-gray-500">
-                  {project.description}
-                </p>
-              )}
-              <p className="mt-2 text-xs text-gray-400">
-                {new Date(project.createdAt).toLocaleDateString()}
-              </p>
-            </div>
+              project={project}
+              onEdit={(p) => setEditingProject(p)}
+              onDelete={(p) => setDeletingProject(p)}
+            />
           ))}
         </div>
       )}
+
+      <ProjectFormModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+      />
+
+      <ProjectFormModal
+        isOpen={editingProject !== null}
+        onClose={() => setEditingProject(null)}
+        project={editingProject ?? undefined}
+      />
+
+      <ConfirmDialog
+        isOpen={deletingProject !== null}
+        message={`Are you sure you want to delete "${deletingProject?.name}"? All boards, tasks, comments, and labels in this project will be permanently deleted.`}
+        confirmLabel="Delete"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeletingProject(null)}
+      />
     </div>
   );
 }
