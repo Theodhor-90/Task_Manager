@@ -6,6 +6,8 @@ import { useBoard } from "../context/board-context";
 import { LoadingSpinner } from "./ui/loading-spinner";
 import { ErrorMessage } from "./ui/error-message";
 import { ConfirmDialog } from "./ui/confirm-dialog";
+import { CommentList } from "./comment-list";
+import { LabelPicker } from "./label-picker";
 import Markdown from "react-markdown";
 import { PRIORITY_CLASSES } from "./task-card";
 
@@ -359,6 +361,21 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Labels */}
+              <div className="mt-4">
+                <LabelPicker
+                  taskId={taskId}
+                  labels={task.labels}
+                  onUpdate={(updatedTask) => setTask(updatedTask)}
+                />
+              </div>
+
+              {/* Comments section */}
+              <div className="mt-6">
+                <h3 className="text-sm font-medium text-gray-700">Comments</h3>
+                <CommentList taskId={taskId} />
               </div>
 
               {/* Delete error */}

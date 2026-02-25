@@ -5,6 +5,7 @@ export type {
   Column,
   Task,
   Comment,
+  PopulatedComment,
   Label,
   Priority,
   LoginRequest,

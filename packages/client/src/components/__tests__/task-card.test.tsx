@@ -1,7 +1,18 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Task, Priority, Label } from "@taskboard/shared";
+
+const mockLabels: Label[] = [
+  { _id: "label1", name: "Bug", color: "#ef4444", project: "proj1", createdAt: "2025-01-01T00:00:00.000Z" },
+  { _id: "label2", name: "Feature", color: "#3b82f6", project: "proj1", createdAt: "2025-01-01T00:00:00.000Z" },
+  { _id: "label3", name: "Enhancement", color: "#10b981", project: "proj1", createdAt: "2025-01-01T00:00:00.000Z" },
+];
+
+vi.mock("../../context/board-context", () => ({
+  useBoard: vi.fn(() => ({ labels: mockLabels })),
+}));
+
 import { TaskCard, PRIORITY_CLASSES } from "../task-card";
-import type { Task, Priority } from "@taskboard/shared";
 
 const baseTask: Task = {
   _id: "task1",
@@ -91,13 +102,16 @@ describe("TaskCard", () => {
     renderCard({
       task: { ...baseTask, labels: ["label1", "label2", "label3"] },
     });
-    const dots = screen.getAllByLabelText("Label");
-    expect(dots).toHaveLength(3);
+    expect(screen.getByLabelText("Bug")).toBeInTheDocument();
+    expect(screen.getByLabelText("Feature")).toBeInTheDocument();
+    expect(screen.getByLabelText("Enhancement")).toBeInTheDocument();
   });
 
   it("does not render label dots when labels array is empty", () => {
     renderCard();
-    expect(screen.queryByLabelText("Label")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Bug")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Feature")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Enhancement")).not.toBeInTheDocument();
   });
 
   it("calls onClick with task ID when card is clicked", () => {
@@ -152,5 +166,33 @@ describe("TaskCard", () => {
     const card = screen.getByRole("button");
     fireEvent.keyDown(card, { key: " " });
     expect(onClick).toHaveBeenCalledWith("task1");
+  });
+
+  it("renders label dots with correct colors", () => {
+    renderCard({
+      task: { ...baseTask, labels: ["label1", "label2"] },
+    });
+    const bugDot = screen.getByLabelText("Bug");
+    const featureDot = screen.getByLabelText("Feature");
+    expect(bugDot).toHaveStyle({ backgroundColor: "#ef4444" });
+    expect(featureDot).toHaveStyle({ backgroundColor: "#3b82f6" });
+  });
+
+  it("renders label dots with title tooltip showing label name", () => {
+    renderCard({
+      task: { ...baseTask, labels: ["label1"] },
+    });
+    const dot = screen.getByLabelText("Bug");
+    expect(dot).toHaveAttribute("title", "Bug");
+  });
+
+  it("skips rendering dots for missing label IDs", () => {
+    renderCard({
+      task: { ...baseTask, labels: ["nonexistent_id"] },
+    });
+    // No label dots should be rendered since the ID doesn't match any label
+    expect(screen.queryByTitle("Bug")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Feature")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Enhancement")).not.toBeInTheDocument();
   });
 });

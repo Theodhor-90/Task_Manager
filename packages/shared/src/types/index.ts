@@ -54,6 +54,15 @@ export interface Comment {
   updatedAt: string;
 }
 
+export interface PopulatedComment {
+  _id: string;
+  body: string;
+  task: string;
+  author: { _id: string; name: string; email: string };
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Label {
   _id: string;
   name: string;

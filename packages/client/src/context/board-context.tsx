@@ -5,7 +5,7 @@ import {
   useState,
 } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import type { Board, Column, Task } from "@taskboard/shared";
+import type { Board, Column, Label, Task } from "@taskboard/shared";
 import {
   fetchBoard,
   fetchBoardTasks,
@@ -21,6 +21,12 @@ import {
   deleteTask as apiDeleteTask,
 } from "../api/tasks";
 import type { UpdateTaskInput } from "../api/tasks";
+import {
+  fetchLabels as apiFetchLabels,
+  createLabel as apiCreateLabel,
+  updateLabel as apiUpdateLabel,
+  deleteLabel as apiDeleteLabel,
+} from "../api/labels";
 
 interface BoardContextValue {
   board: Board | null;
@@ -37,6 +43,10 @@ interface BoardContextValue {
   updateTask: (taskId: string, updates: UpdateTaskInput) => Promise<Task>;
   removeTask: (taskId: string) => Promise<void>;
   setTasks: Dispatch<SetStateAction<Task[]>>;
+  labels: Label[];
+  addLabel: (name: string, color: string) => Promise<Label>;
+  updateLabel: (labelId: string, input: { name?: string; color?: string }) => Promise<Label>;
+  removeLabel: (labelId: string) => Promise<void>;
 }
 
 const BoardContext = createContext<BoardContextValue | null>(null);
@@ -46,6 +56,7 @@ export function BoardProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [labels, setLabels] = useState<Label[]>([]);
 
   const loadBoard = useCallback(async (projectId: string): Promise<void> => {
     setIsLoading(true);
@@ -55,8 +66,12 @@ export function BoardProvider({ children }: { children: ReactNode }) {
       const loadedBoard = boardResponse.data;
       setBoard(loadedBoard);
 
-      const tasksResponse = await fetchBoardTasks(loadedBoard._id);
+      const [tasksResponse, labelsResponse] = await Promise.all([
+        fetchBoardTasks(loadedBoard._id),
+        apiFetchLabels(loadedBoard.project),
+      ]);
       setTasks(tasksResponse.data);
+      setLabels(labelsResponse.data);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to load board";
       setError(message);
@@ -240,11 +255,50 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const addLabel = useCallback(
+    async (name: string, color: string): Promise<Label> => {
+      if (!board) throw new Error("Board not loaded");
+      const response = await apiCreateLabel(board.project, { name, color });
+      const newLabel = response.data;
+      setLabels((prev) => [...prev, newLabel]);
+      return newLabel;
+    },
+    [board],
+  );
+
+  const updateLabel = useCallback(
+    async (labelId: string, input: { name?: string; color?: string }): Promise<Label> => {
+      const response = await apiUpdateLabel(labelId, input);
+      const updatedLabel = response.data;
+      setLabels((prev) =>
+        prev.map((l) => (l._id === labelId ? updatedLabel : l)),
+      );
+      return updatedLabel;
+    },
+    [],
+  );
+
+  const removeLabel = useCallback(
+    async (labelId: string): Promise<void> => {
+      await apiDeleteLabel(labelId);
+      setLabels((prev) => prev.filter((l) => l._id !== labelId));
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.labels.includes(labelId)
+            ? { ...t, labels: t.labels.filter((id) => id !== labelId) }
+            : t,
+        ),
+      );
+    },
+    [],
+  );
+
   return (
     <BoardContext.Provider
       value={{
         board,
         tasks,
+        labels,
         isLoading,
         error,
         loadBoard,
@@ -257,6 +311,9 @@ export function BoardProvider({ children }: { children: ReactNode }) {
         updateTask,
         removeTask,
         setTasks,
+        addLabel,
+        updateLabel,
+        removeLabel,
       }}
     >
       {children}

@@ -15,6 +15,7 @@ import {
   updateTask as apiUpdateTask,
   deleteTask as apiDeleteTask,
 } from "../../api/tasks";
+import { fetchLabels } from "../../api/labels";
 
 vi.mock("../../api/boards", () => ({
   fetchBoard: vi.fn(),
@@ -32,8 +33,16 @@ vi.mock("../../api/tasks", () => ({
   deleteTask: vi.fn(),
 }));
 
+vi.mock("../../api/labels", () => ({
+  fetchLabels: vi.fn(),
+  createLabel: vi.fn(),
+  updateLabel: vi.fn(),
+  deleteLabel: vi.fn(),
+}));
+
 const mockFetchBoard = fetchBoard as ReturnType<typeof vi.fn>;
 const mockFetchBoardTasks = fetchBoardTasks as ReturnType<typeof vi.fn>;
+const mockFetchLabels = fetchLabels as ReturnType<typeof vi.fn>;
 const mockAddColumn = addColumn as ReturnType<typeof vi.fn>;
 const mockRenameColumn = renameColumn as ReturnType<typeof vi.fn>;
 const mockDeleteColumn = deleteColumn as ReturnType<typeof vi.fn>;
@@ -144,6 +153,8 @@ function renderWithProvider() {
 describe("BoardContext", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default mock for labels API to prevent errors in loadBoard
+    mockFetchLabels.mockResolvedValue({ data: [] });
   });
 
   it("useBoard throws when used outside BoardProvider", () => {
