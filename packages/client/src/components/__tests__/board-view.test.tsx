@@ -95,14 +95,41 @@ vi.mock("../column", () => ({
 }));
 
 vi.mock("../task-card", () => ({
-  TaskCard: ({ task }: { task: { _id: string; title: string } }) => (
-    <div data-testid={`task-card-${task._id}`}>{task.title}</div>
+  TaskCard: ({
+    task,
+    onClick,
+  }: {
+    task: { _id: string; title: string };
+    onClick?: (taskId: string) => void;
+  }) => (
+    <div
+      data-testid={`task-card-${task._id}`}
+      onClick={() => onClick?.(task._id)}
+    >
+      {task.title}
+    </div>
   ),
 }));
 
 vi.mock("../add-task-form", () => ({
   AddTaskForm: ({ columnName }: { columnName: string }) => (
     <div data-testid={`add-task-form-${columnName}`}>+ Add task</div>
+  ),
+}));
+
+vi.mock("../task-detail-panel", () => ({
+  TaskDetailPanel: ({
+    taskId,
+    onClose,
+  }: {
+    taskId: string;
+    onClose: () => void;
+  }) => (
+    <div data-testid="task-detail-panel" data-task-id={taskId}>
+      <button onClick={onClose} data-testid="close-panel">
+        Close
+      </button>
+    </div>
   ),
 }));
 
@@ -171,6 +198,8 @@ function defaultBoardState() {
     createTask: vi.fn().mockResolvedValue(undefined),
     moveTask: vi.fn().mockResolvedValue(undefined),
     setTasks: vi.fn(),
+    updateTask: vi.fn().mockResolvedValue(undefined),
+    removeTask: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -485,4 +514,82 @@ describe("BoardView", () => {
   // and onDragEnd to properly update the handler closures. The drop-on-empty-column behavior
   // is implicitly covered by the onDragOver handler logic (tested separately) and the general
   // moveTask call verification in other tests.
+
+  it("clicking a task card opens the task detail panel", async () => {
+    renderBoardView();
+
+    const taskCard = screen.getByTestId("task-card-task1");
+    fireEvent.click(taskCard);
+
+    expect(screen.getByTestId("task-detail-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("task-detail-panel")).toHaveAttribute(
+      "data-task-id",
+      "task1",
+    );
+  });
+
+  it("does not render task detail panel when no task is selected", () => {
+    renderBoardView();
+    expect(screen.queryByTestId("task-detail-panel")).not.toBeInTheDocument();
+  });
+
+  it("closing the panel hides it", async () => {
+    renderBoardView();
+
+    // Open panel
+    fireEvent.click(screen.getByTestId("task-card-task1"));
+    expect(screen.getByTestId("task-detail-panel")).toBeInTheDocument();
+
+    // Close panel
+    fireEvent.click(screen.getByTestId("close-panel"));
+    expect(screen.queryByTestId("task-detail-panel")).not.toBeInTheDocument();
+  });
+
+  it("drag-and-drop does not open the task detail panel", () => {
+    renderBoardView();
+
+    // Simulate a drag operation
+    act(() => {
+      capturedOnDragStart!({
+        active: {
+          id: "task1",
+          data: { current: { type: "task", task: mockTasks[0] } },
+        },
+      });
+
+      capturedOnDragEnd!({
+        active: {
+          id: "task1",
+          data: { current: { type: "task", task: mockTasks[0] } },
+        },
+        over: {
+          id: "task1",
+          data: { current: { type: "task", task: mockTasks[0] } },
+        },
+      });
+    });
+
+    // Click the task card — should be suppressed by drag guard
+    fireEvent.click(screen.getByTestId("task-card-task1"));
+
+    expect(screen.queryByTestId("task-detail-panel")).not.toBeInTheDocument();
+  });
+
+  it("clicking a different task card updates the panel", () => {
+    renderBoardView();
+
+    // Open panel for task1
+    fireEvent.click(screen.getByTestId("task-card-task1"));
+    expect(screen.getByTestId("task-detail-panel")).toHaveAttribute(
+      "data-task-id",
+      "task1",
+    );
+
+    // Click task2
+    fireEvent.click(screen.getByTestId("task-card-task2"));
+    expect(screen.getByTestId("task-detail-panel")).toHaveAttribute(
+      "data-task-id",
+      "task2",
+    );
+  });
 });
