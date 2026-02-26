@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 
 const scriptName = process.argv[2];
@@ -28,14 +28,23 @@ if (workspaceDirs.length === 0) {
   process.exit(0);
 }
 
-const result = spawnSync(
+const child = spawn(
   'npm',
   ['run', scriptName, '--workspaces', '--if-present'],
-  { stdio: 'inherit' }
+  { stdio: 'inherit', detached: true }
 );
 
-if (typeof result.status === 'number') {
-  process.exit(result.status);
+function cleanup(signal) {
+  try { process.kill(-child.pid, signal); } catch { /* already dead */ }
 }
 
-process.exit(1);
+process.on('SIGTERM', () => cleanup('SIGTERM'));
+process.on('SIGINT', () => cleanup('SIGINT'));
+
+child.on('close', (code) => {
+  process.exit(typeof code === 'number' ? code : 1);
+});
+
+child.on('error', () => {
+  process.exit(1);
+});

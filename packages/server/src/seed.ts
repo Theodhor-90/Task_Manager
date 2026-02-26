@@ -8,11 +8,11 @@ export async function seedDefaultUser(): Promise<void> {
     return;
   }
 
-  const passwordHash = await hashPassword("admin123");
+  const passwordHash = await hashPassword("testtest");
   await UserModel.create({
-    email: "admin@taskboard.local",
+    email: "admin@email.com",
     name: "Admin",
     passwordHash,
   });
-  console.log("Seed: created default admin user (admin@taskboard.local)");
+  console.log("Seed: created default admin user (admin@email.com)");
 }

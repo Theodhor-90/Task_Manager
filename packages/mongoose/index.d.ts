@@ -14,6 +14,8 @@ export namespace Types {
   class ObjectId {
     constructor(value?: string);
     toString(): string;
+    toJSON(): string;
+    static isValid(input: string): boolean;
   }
 
   interface DocumentArray<T> extends Array<T> {}
@@ -32,6 +34,11 @@ export class Schema<T = unknown> {
   readonly options: SchemaOptions;
 }
 
+export interface Query<TResult> extends PromiseLike<TResult> {
+  populate(field: string, select?: string): Query<TResult>;
+  sort(sortObj?: Record<string, number>): Query<TResult>;
+}
+
 export interface Model<T = unknown> {
   readonly modelName: string;
   readonly schema: Schema<T>;
@@ -39,10 +46,25 @@ export interface Model<T = unknown> {
   create(doc: Partial<T> & Record<string, unknown>): Promise<T & Document>;
   findOne(
     filter?: Partial<T> & Record<string, unknown>
-  ): Promise<(T & Document) | null>;
+  ): Query<(T & Document) | null>;
   deleteMany(
     filter?: Partial<T> & Record<string, unknown>
   ): Promise<{ deletedCount: number }>;
+  deleteOne(
+    filter?: Partial<T> & Record<string, unknown>
+  ): Promise<{ deletedCount: number }>;
+  find(
+    filter?: Partial<T> & Record<string, unknown>
+  ): Query<(T & Document)[]>;
+  findOneAndUpdate(
+    filter?: Partial<T> & Record<string, unknown>,
+    update?: Partial<T> & Record<string, unknown>,
+    options?: Record<string, unknown>
+  ): Promise<(T & Document) | null>;
+  updateMany(
+    filter?: Partial<T> & Record<string, unknown>,
+    update?: Record<string, unknown>
+  ): Promise<{ matchedCount: number; modifiedCount: number }>;
 }
 
 export interface Mongoose {
