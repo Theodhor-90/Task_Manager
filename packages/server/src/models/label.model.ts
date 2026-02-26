@@ -3,7 +3,7 @@ import mongoose, { Schema, type Document, type Types } from "mongoose";
 export interface LabelDocument extends Document {
   name: string;
   color: string;
-  project: Types.ObjectId;
+  project: string | Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }

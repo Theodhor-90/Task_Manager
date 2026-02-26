@@ -7,7 +7,7 @@ export interface ColumnDocument {
 }
 
 export interface BoardDocument extends Document {
-  project: Types.ObjectId;
+  project: string | Types.ObjectId;
   columns: Types.DocumentArray<ColumnDocument>;
   createdAt: Date;
   updatedAt: Date;

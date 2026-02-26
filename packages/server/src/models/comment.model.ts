@@ -2,8 +2,8 @@ import mongoose, { Schema, type Document, type Types } from "mongoose";
 
 export interface CommentDocument extends Document {
   body: string;
-  task: Types.ObjectId;
-  author: Types.ObjectId;
+  task: string | Types.ObjectId;
+  author: string | Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }

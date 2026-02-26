@@ -1,7 +1,7 @@
 import type { ApiErrorResponse } from "@taskboard/shared";
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_URL ?? "http://localhost:3001";
+  import.meta.env.VITE_API_URL ?? "";
 
 export const TOKEN_KEY = "taskboard_token";
 
